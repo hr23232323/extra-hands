@@ -6,16 +6,23 @@
   <title>extra-hands</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;1,400&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
   <!-- ── Header ──────────────────────────────────────────────────────────── -->
   <header>
-    <span class="logo">extra-hands</span>
+    <div class="logo">
+      <svg class="logo-mark" width="11" height="14" viewBox="0 0 18 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <rect x="0.5"  y="10" width="4" height="10" rx="2" fill="currentColor"/>
+        <rect x="7"    y="4"  width="4" height="16" rx="2" fill="currentColor"/>
+        <rect x="13.5" y="7"  width="4" height="13" rx="2" fill="currentColor"/>
+      </svg>
+      <span class="logo-text">extra<span class="logo-hyphen">-</span>hands</span>
+    </div>
     <div class="header-right">
-      <button id="theme-btn" class="icon-btn" title="Toggle theme">
+      <button id="theme-btn" class="hdr-btn" title="Toggle theme">
         <svg id="theme-icon-moon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M13 9.5a5.5 5.5 0 1 1-6.5-6.5 4.5 4.5 0 0 0 6.5 6.5z"/>
         </svg>
@@ -25,7 +32,14 @@
           <line x1="1" y1="8" x2="3" y2="8"/><line x1="13" y1="8" x2="15" y2="8"/>
         </svg>
       </button>
-      <button id="settings-btn" class="icon-btn" title="Settings">
+      <button id="history-btn" class="hdr-btn" title="Thread history">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="8" cy="8" r="6.5"/>
+          <polyline points="8 4.5 8 8 10.5 9.5"/>
+        </svg>
+      </button>
+      <button id="new-btn" class="hdr-btn hdr-btn--text" title="New task">new</button>
+      <button id="settings-btn" class="hdr-btn" title="Settings">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="3"/>
           <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
@@ -47,53 +61,53 @@
     </div>
   </div>
 
+  <!-- ── History panel (slide-in overlay) ───────────────────────────────── -->
+  <div id="history-panel" class="history-panel" aria-hidden="true">
+    <div class="history-header">
+      <span class="history-title">threads</span>
+      <button id="history-close-btn" class="icon-btn" title="Close">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+          <line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/>
+        </svg>
+      </button>
+    </div>
+    <div class="history-search-wrap">
+      <input id="history-search" class="history-search" type="search" placeholder="search threads…" autocomplete="off" spellcheck="false" />
+    </div>
+    <div id="history-list" class="history-list"></div>
+    <div id="history-empty" class="history-empty" style="display:none">no threads yet</div>
+  </div>
+  <div id="history-backdrop" class="history-backdrop" aria-hidden="true"></div>
+
   <!-- ── Home view ───────────────────────────────────────────────────────── -->
   <div id="view-home" class="view">
 
-    <!-- Workspace row -->
-    <div class="workspace-row">
-      <div class="workspace-info">
-        <span class="workspace-label">workspace</span>
-        <span id="workspace-path" class="workspace-path">no folder selected</span>
-      </div>
-      <button id="pick-folder-btn" class="ghost-btn">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M1 3.5A1.5 1.5 0 0 1 2.5 2h3.44l1.5 2H13.5A1.5 1.5 0 0 1 15 5.5v7a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 12.5z"/>
-        </svg>
-        change
-      </button>
-    </div>
-
-    <!-- Compose area -->
     <div class="compose-area">
-      <textarea
-        id="task-input"
-        class="task-textarea"
-        placeholder="Describe a task…"
-        rows="4"
-        spellcheck="true"
-      ></textarea>
-      <div class="compose-examples" id="compose-examples">
+      <div class="compose-examples">
         <span class="example-label">try:</span>
         <button class="example-chip" data-task="Scrape product prices from a website and save them as a CSV">scrape → CSV</button>
         <button class="example-chip" data-task="Write a Python script to convert all CSVs in my folder to PDF">CSV → PDF script</button>
         <button class="example-chip" data-task="Research and write a briefing doc on [topic], pulling in sources from the web">research doc</button>
       </div>
-      <div class="compose-footer">
-        <span id="compose-hint" class="compose-hint"></span>
-        <button id="run-btn" class="run-btn" disabled>
-          run task
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="5 3 12 8 5 13"/>
+
+      <div class="compose-input-wrap">
+        <textarea id="task-input" class="task-textarea" placeholder="Describe a task…" rows="4" spellcheck="true"></textarea>
+        <button id="run-btn" class="send-btn" disabled aria-label="Run task">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 12V4M4 8l4-4 4 4"/>
           </svg>
         </button>
       </div>
-    </div>
 
-    <!-- Recent threads -->
-    <div id="threads-section" class="threads-section" style="display:none">
-      <div class="threads-header">recent</div>
-      <div id="threads-list" class="threads-list"></div>
+      <div class="compose-footer">
+        <button id="pick-folder-btn" class="workspace-btn">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 3.5A1.5 1.5 0 0 1 2.5 2h3.44l1.5 2H13.5A1.5 1.5 0 0 1 15 5.5v7a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 12.5z"/>
+          </svg>
+          <span id="workspace-path" class="workspace-path">no folder selected</span>
+        </button>
+        <span id="compose-hint" class="compose-hint"></span>
+      </div>
     </div>
 
   </div>
@@ -113,9 +127,7 @@
 
     <div class="thread-task-title" id="thread-task-title"></div>
 
-    <div id="agent-feed" class="agent-feed">
-      <!-- Tool call chips and streamed output appear here -->
-    </div>
+    <div id="agent-feed" class="agent-feed"></div>
 
     <div id="agent-result" class="agent-result" style="display:none">
       <div class="result-label">result</div>

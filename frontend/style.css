@@ -348,92 +348,11 @@ header {
   min-height: 0;
 }
 
-/* ── Workspace row ──────────────────────────────────────────────────────── */
-.workspace-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 18px;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
-  flex-shrink: 0;
-  gap: 12px;
-}
-
-.workspace-info {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  min-width: 0;
-  flex: 1;
-}
-
-.workspace-label {
-  font-size: 10px;
-  font-family: var(--mono);
-  color: var(--text-faint);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  flex-shrink: 0;
-}
-
-.workspace-path {
-  font-size: 12px;
-  font-family: var(--mono);
-  color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  direction: rtl;
-  text-align: left;
-}
-.workspace-path.has-path { color: var(--accent); }
-
-.ghost-btn {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  background: none;
-  border: 1px solid var(--border);
-  border-radius: var(--r);
-  color: var(--text-muted);
-  font-size: 12px;
-  font-family: var(--sans);
-  padding: 4px 10px;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: border-color 0.15s, color 0.15s;
-  flex-shrink: 0;
-}
-.ghost-btn svg { width: 12px; height: 12px; }
-.ghost-btn:hover { border-color: var(--accent); color: var(--accent); }
-
 /* ── Compose area ───────────────────────────────────────────────────────── */
 .compose-area {
-  padding: 20px 18px 14px;
+  padding: 14px 16px 12px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
-}
-
-.task-textarea {
-  width: 100%;
-  background: var(--surface);
-  border: 1.5px solid var(--border);
-  border-radius: var(--r-lg);
-  color: var(--text);
-  font-size: 14px;
-  font-family: var(--sans);
-  line-height: 1.6;
-  padding: 12px 14px;
-  resize: none;
-  outline: none;
-  transition: border-color 0.15s, background 0.15s;
-  display: block;
-}
-.task-textarea::placeholder { color: var(--text-faint); }
-.task-textarea:focus {
-  border-color: var(--accent);
-  background: var(--bg);
 }
 
 .compose-examples {
@@ -441,7 +360,7 @@ header {
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
-  margin-top: 10px;
+  margin-bottom: 10px;
 }
 
 .example-label {
@@ -460,47 +379,115 @@ header {
   font-family: var(--mono);
   padding: 2px 10px;
   cursor: pointer;
+  transition: border-color 0.15s;
+}
+.example-chip:hover { border-color: var(--accent); }
+
+/* Unified chat-style input box */
+.compose-input-wrap {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  padding: 10px 10px 10px 14px;
   transition: border-color 0.15s, background 0.15s;
 }
-.example-chip:hover {
+.compose-input-wrap:focus-within {
   border-color: var(--accent);
-  background: var(--accent-bg);
+  background: var(--bg);
 }
 
+.task-textarea {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-size: 14px;
+  font-family: var(--sans);
+  line-height: 1.6;
+  padding: 0;
+  resize: none;
+  outline: none;
+  min-width: 0;
+}
+.task-textarea::placeholder { color: var(--text-faint); }
+
+/* Circular send button */
+.send-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--border-dark);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: not-allowed;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.12s;
+}
+.send-btn svg { width: 15px; height: 15px; }
+.send-btn:not(:disabled) {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+.send-btn:not(:disabled):hover {
+  background: var(--accent-dark);
+  border-color: var(--accent-dark);
+  transform: scale(1.06);
+}
+.send-btn:not(:disabled):active { transform: scale(0.96); }
+
+/* Folder picker + hint row */
 .compose-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 12px;
-  gap: 10px;
+  margin-top: 8px;
+  gap: 8px;
+  min-width: 0;
 }
+
+.workspace-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-faint);
+  padding: 0;
+  min-width: 0;
+  flex: 1;
+  transition: color 0.15s;
+}
+.workspace-btn:hover { color: var(--accent); }
+.workspace-btn svg { width: 11px; height: 11px; flex-shrink: 0; }
+
+.workspace-path {
+  font-size: 11px;
+  font-family: var(--mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
+  min-width: 0;
+}
+.workspace-path.has-path { color: var(--accent); }
 
 .compose-hint {
   font-size: 11px;
   font-family: var(--mono);
   color: var(--text-faint);
-  flex: 1;
-}
-
-.run-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--accent);
-  color: #fff;
-  border: none;
-  border-radius: var(--r);
-  font-size: 13px;
-  font-family: var(--sans);
-  font-weight: 500;
-  padding: 7px 16px;
-  cursor: pointer;
-  transition: background 0.15s, opacity 0.15s;
+  flex-shrink: 0;
   white-space: nowrap;
 }
-.run-btn svg { width: 13px; height: 13px; }
-.run-btn:hover:not(:disabled) { background: var(--accent-dark); }
-.run-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 
 /* ── Thread / agent view ────────────────────────────────────────────────── */
