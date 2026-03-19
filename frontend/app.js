@@ -4,16 +4,49 @@ import {
   loadState, savePrefs, saveApiKey,
   createThread, loadThread, updateActiveThread,
   appendMessage, flushActiveThread,
+  addTrustedFolder,
 } from "./state.js";
 import { orchestrateMessage } from "./search.js";
 
 // ── Tauri IPC stubs ────────────────────────────────────────────────────────────
 const invoke = window.__TAURI__?.core?.invoke ?? (() => Promise.resolve(null));
 
-async function listDir(path)            { return invoke("list_dir",   { path })  ?? []; }
-async function readFile(path)           { return invoke("read_file",  { path })  ?? ""; }
-async function writeFile(path, content) { return invoke("write_file", { path, content }) ?? null; }
-async function pickFolder()             { return invoke("pick_folder") ?? null; }
+async function listDir(path)            { return invoke("list_dir",   { path }); }
+async function readFile(path)           { return invoke("read_file",  { path }); }
+async function writeFile(path, content) { return invoke("write_file", { path, content }); }
+async function pickFolder()             { return invoke("pick_folder"); }
+
+function _parentDir(path) {
+  const norm = path.replace(/\\/g, "/");
+  const i = norm.lastIndexOf("/");
+  return i > 0 ? norm.slice(0, i) : norm;
+}
+
+// ── Permission prompt ──────────────────────────────────────────────────────────
+let _permResolve = null;
+
+function showPermissionPrompt(toolName, path) {
+  return new Promise(resolve => {
+    _permResolve = resolve;
+    $("perm-tool").textContent = toolName;
+    $("perm-path").textContent = path;
+    $("permission-prompt").style.display = "flex";
+    $("agent-feed").scrollTop = $("agent-feed").scrollHeight;
+  });
+}
+
+function hidePermissionPrompt() {
+  $("permission-prompt").style.display = "none";
+  _permResolve = null;
+}
+
+async function checkPermission(toolName, path) {
+  const { workspace, trustedFolders } = getState();
+  const norm = path.replace(/\\/g, "/");
+  if (workspace && norm.startsWith(workspace.replace(/\\/g, "/"))) return "allow";
+  if (trustedFolders.some(f => norm.startsWith(f.replace(/\\/g, "/")))) return "allow";
+  return showPermissionPrompt(toolName, path);
+}
 
 // ── Models ─────────────────────────────────────────────────────────────────────
 const MODELS = [
@@ -310,16 +343,29 @@ async function executeTool(toolName, argsStr) {
   let args;
   try { args = JSON.parse(argsStr); } catch { return "Error: could not parse tool args."; }
 
+  const path = args.path ?? "";
+  const decision = await checkPermission(toolName, path);
+
+  if (decision === "deny") return "Error: access denied by user.";
+
+  if (decision === "always") {
+    addTrustedFolder(toolName === "list_dir" ? path : _parentDir(path));
+  }
+
   const { activeThread } = getState();
   if (activeThread) {
-    await appendMessage({ type: "tool", toolName, toolArg: args.path ?? "" });
+    await appendMessage({ type: "tool", toolName, toolArg: path });
     if (viewThread.style.display !== "none") renderThreadView();
   }
 
-  if (toolName === "list_dir")   return JSON.stringify(await listDir(args.path));
-  if (toolName === "read_file")  return await readFile(args.path);
-  if (toolName === "write_file") { await writeFile(args.path, args.content); return "ok"; }
-  return "Error: unknown tool.";
+  try {
+    if (toolName === "list_dir")   return JSON.stringify(await listDir(path));
+    if (toolName === "read_file")  return await readFile(path);
+    if (toolName === "write_file") { await writeFile(path, args.content ?? ""); return "ok"; }
+    return "Error: unknown tool.";
+  } catch (err) {
+    return `Error: ${err.message ?? err}`;
+  }
 }
 
 async function runAgentLoop() {
@@ -475,6 +521,10 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   $("back-btn").addEventListener("click", showHome);
+
+  $("perm-deny-btn").addEventListener("click", () => { hidePermissionPrompt(); _permResolve?.("deny"); });
+  $("perm-allow-btn").addEventListener("click", () => { hidePermissionPrompt(); _permResolve?.("allow"); });
+  $("perm-always-btn").addEventListener("click", () => { hidePermissionPrompt(); _permResolve?.("always"); });
 
   // Close panels when clicking outside
   document.addEventListener("click", (e) => {

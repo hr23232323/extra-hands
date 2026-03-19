@@ -4,16 +4,19 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     Manager, Runtime,
 };
+use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_store::StoreExt;
 
 const WINDOW_WIDTH: f64 = 480.0;
 const PADDING: f64 = 8.0;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct Prefs {
-    model:     Option<String>,
-    theme:     Option<String>,
-    workspace: Option<String>,
+    model:           Option<String>,
+    theme:           Option<String>,
+    workspace:       Option<String>,
+    trusted_folders: Option<Vec<String>>,
 }
 
 #[tauri::command]
@@ -41,7 +44,7 @@ fn get_prefs(app: tauri::AppHandle) -> Prefs {
             }
         }
     }
-    Prefs { model: None, theme: None, workspace: None }
+    Prefs { model: None, theme: None, workspace: None, trusted_folders: None }
 }
 
 #[tauri::command]
@@ -98,6 +101,42 @@ fn save_thread(app: tauri::AppHandle, id: String, thread: serde_json::Value) {
     }
 }
 
+// ── File tools ────────────────────────────────────────────────────────────────
+
+#[tauri::command]
+async fn pick_folder(app: tauri::AppHandle) -> Option<String> {
+    app.dialog()
+        .file()
+        .blocking_pick_folder()
+        .map(|f| f.to_string())
+}
+
+#[tauri::command]
+fn list_dir(path: String) -> Result<Vec<serde_json::Value>, String> {
+    let entries = std::fs::read_dir(&path).map_err(|e| e.to_string())?;
+    Ok(entries
+        .filter_map(|e| e.ok())
+        .map(|e| {
+            let name = e.file_name().to_string_lossy().to_string();
+            let is_dir = e.file_type().map(|t| t.is_dir()).unwrap_or(false);
+            serde_json::json!({ "name": name, "is_dir": is_dir })
+        })
+        .collect())
+}
+
+#[tauri::command]
+fn read_file(path: String) -> Result<String, String> {
+    std::fs::read_to_string(&path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn write_file(path: String, content: String) -> Result<(), String> {
+    if let Some(parent) = std::path::Path::new(&path).parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    std::fs::write(&path, content).map_err(|e| e.to_string())
+}
+
 fn toggle_window<R: Runtime>(app: &tauri::AppHandle<R>, tray_rect: &tauri::Rect) {
     if let Some(window) = app.get_webview_window("main") {
         if window.is_visible().unwrap_or(false) {
@@ -136,6 +175,7 @@ fn toggle_window<R: Runtime>(app: &tauri::AppHandle<R>, tray_rect: &tauri::Rect)
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::default().build())
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             get_api_key,
             set_api_key,
@@ -145,6 +185,10 @@ pub fn run() {
             set_thread_index,
             get_thread,
             save_thread,
+            pick_folder,
+            list_dir,
+            read_file,
+            write_file,
         ])
         .setup(|app| {
             let _ = app.store("store.json")?;

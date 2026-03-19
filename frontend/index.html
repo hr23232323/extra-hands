@@ -145,6 +145,22 @@
 
     <div id="agent-feed" class="agent-feed"></div>
 
+    <div id="permission-prompt" class="permission-prompt" style="display:none">
+      <div class="perm-info">
+        <svg class="perm-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="7" width="10" height="8" rx="1.5"/>
+          <path d="M5 7V5a3 3 0 0 1 6 0v2"/>
+        </svg>
+        <span id="perm-tool" class="perm-tool"></span>
+      </div>
+      <div id="perm-path" class="perm-path"></div>
+      <div class="perm-actions">
+        <button id="perm-deny-btn" class="perm-btn perm-btn--deny">deny</button>
+        <button id="perm-allow-btn" class="perm-btn">allow</button>
+        <button id="perm-always-btn" class="perm-btn perm-btn--always">always this folder</button>
+      </div>
+    </div>
+
     <div id="agent-result" class="agent-result" style="display:none">
       <div class="result-label">result</div>
       <div id="result-content" class="result-content"></div>

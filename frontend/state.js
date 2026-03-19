@@ -9,12 +9,13 @@ const invoke = window.__TAURI__?.core?.invoke ?? (() => Promise.resolve(null));
 
 // ── Internal state ─────────────────────────────────────────────────────────────
 let _state = {
-  apiKey:       null,
-  model:        "qwen/qwen3-32b:nitro",
-  theme:        "light",
-  workspace:    null,
-  threadIndex:  [],   // [{id, title, createdAt, status}] — always in memory
-  activeThread: null, // full thread object — loaded on demand
+  apiKey:         null,
+  model:          "qwen/qwen3-32b:nitro",
+  theme:          "light",
+  workspace:      null,
+  trustedFolders: [],
+  threadIndex:    [],   // [{id, title, createdAt, status}] — always in memory
+  activeThread:   null, // full thread object — loaded on demand
 };
 
 // ── Public API ─────────────────────────────────────────────────────────────────
@@ -132,14 +133,21 @@ export async function loadState() {
   if (prefs?.model)     patch.model       = prefs.model;
   if (prefs?.theme)     patch.theme       = prefs.theme;
   if (prefs?.workspace) patch.workspace   = prefs.workspace;
+  if (Array.isArray(prefs?.trustedFolders) && prefs.trustedFolders.length) patch.trustedFolders = prefs.trustedFolders;
   if (Array.isArray(threadIndex) && threadIndex.length) patch.threadIndex = threadIndex;
 
   if (Object.keys(patch).length) setState(patch);
 }
 
 export async function savePrefs() {
-  const { model, theme, workspace } = _state;
-  await invoke("set_prefs", { prefs: { model, theme, workspace } });
+  const { model, theme, workspace, trustedFolders } = _state;
+  await invoke("set_prefs", { prefs: { model, theme, workspace, trustedFolders } });
+}
+
+export function addTrustedFolder(folderPath) {
+  if (_state.trustedFolders.includes(folderPath)) return;
+  setState({ trustedFolders: [..._state.trustedFolders, folderPath] });
+  savePrefs();
 }
 
 export async function saveApiKey(key) {

@@ -679,6 +679,89 @@ header {
   opacity: 0.6;
 }
 
+/* ── Permission prompt ──────────────────────────────────────────────────── */
+.permission-prompt {
+  border-top: 1px solid var(--border);
+  padding: 14px 18px;
+  background: var(--surface);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: slideUp 0.18s ease both;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.perm-info {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.perm-icon {
+  width: 13px;
+  height: 13px;
+  color: var(--text-faint);
+  flex-shrink: 0;
+}
+
+.perm-tool {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.perm-path {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  word-break: break-all;
+  line-height: 1.5;
+  padding-left: 20px;
+}
+
+.perm-actions {
+  display: flex;
+  gap: 6px;
+  padding-left: 20px;
+}
+
+.perm-btn {
+  font-size: 11px;
+  font-family: var(--mono);
+  padding: 4px 10px;
+  border-radius: var(--r);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.perm-btn:hover {
+  border-color: var(--border-dark);
+  color: var(--text);
+}
+.perm-btn--deny:hover {
+  border-color: var(--error);
+  color: var(--error);
+}
+.perm-btn--always {
+  background: var(--accent-bg);
+  border-color: transparent;
+  color: var(--accent);
+}
+.perm-btn--always:hover {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
 /* ── Agent result ───────────────────────────────────────────────────────── */
 .agent-result {
   border-top: 1px solid var(--border);
