@@ -656,10 +656,12 @@ Work autonomously. When done, summarize what you did and what files were created
   function onDelta(delta) {
     if (viewThread.style.display === "none") return;
     if (!contentEl) {
-      // First text — collapse thinking, start assistant bubble
+      // First text of this turn — capture accumulated tools, reset for next turn
       _liveThinkingEl = null;
       collapseThinking(thinkingEl, () => {});
-      const msgEl = _makeChatMsg("assistant", "", _liveTools);
+      const capturedTools = _liveTools;
+      _liveTools = [];
+      const msgEl = _makeChatMsg("assistant", "", capturedTools);
       feed.appendChild(msgEl);
       contentEl = msgEl.querySelector(".bubble-content");
       mdParser = smd.parser(smd.default_renderer(contentEl));
@@ -681,7 +683,8 @@ Work autonomously. When done, summarize what you did and what files were created
     if (observer) { observer.disconnect(); observer = null; }
     if (mdParser) { smd.parser_end(mdParser); mdParser = null; }
     contentEl = null;
-    _liveTools = [];
+    // _liveTools intentionally NOT cleared here — tools accumulate across
+    // tool-call turns and are captured when the next text bubble is created
   }
 
   try {
