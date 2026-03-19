@@ -19,6 +19,36 @@ async function pickFolder()             { return invoke("pick_folder"); }
 
 const normPath = p => p.replace(/\\/g, "/");
 
+// ── Title generation ────────────────────────────────────────────────────────────
+const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+
+async function generateTitle(task, apiKey, model) {
+  try {
+    const res = await fetch(OPENROUTER_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+        "HTTP-Referer": "https://github.com/hr23232323/extra-hands",
+        "X-Title": "extra-hands",
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: "Reply with a 2-5 word title for this task. Only the title, no punctuation, no explanation." },
+          { role: "user", content: task },
+        ],
+        max_tokens: 20,
+      }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.choices?.[0]?.message?.content?.trim() ?? null;
+  } catch {
+    return null;
+  }
+}
+
 // Box any path (relative, absolute, or already workspace-prefixed) into the
 // workspace root. Neutralizes path traversal (../../etc/passwd → workspace/etc/passwd).
 function boxPath(workspace, rawPath) {
@@ -380,7 +410,7 @@ function renderThreadView() {
   const { activeThread } = getState();
   if (!activeThread) { showHome(); return; }
 
-  $("thread-task-title").textContent = activeThread.title;
+  $("thread-task-title").value = activeThread.title;
   _setStatusBadge(activeThread.status);
 
   const feed = $("agent-feed");
@@ -484,7 +514,7 @@ function _setThreadComposeEnabled(enabled) {
 }
 
 function _buildMessages(thread) {
-  const messages = [{ role: "user", content: thread.title }];
+  const messages = [{ role: "user", content: thread.prompt ?? thread.title }];
   for (const msg of thread.messages) {
     if (msg.type === "text")       messages.push({ role: "assistant", content: msg.content });
     else if (msg.type === "user")  messages.push({ role: "user",      content: msg.content });
@@ -651,6 +681,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   $("pick-folder-btn").addEventListener("click", handlePickFolder);
   $("task-input").addEventListener("input", updateRunButton);
+  $("task-input").addEventListener("keydown", e => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("run-btn").click(); }
+  });
 
   const _arrowSvg = `<svg class="task-card-arrow" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 10L10 2M10 2H5M10 2v5"/></svg>`;
   document.querySelectorAll(".task-card").forEach(card => {
@@ -669,6 +702,18 @@ document.addEventListener("DOMContentLoaded", () => {
     $("task-input").value = "";
     updateRunButton();
     showThread();
+
+    // Generate a short display name in parallel — doesn't block the agent
+    const { apiKey, model } = getState();
+    generateTitle(title, apiKey, model).then(short => {
+      if (!short) return;
+      const { activeThread } = getState();
+      if (!activeThread) return;
+      updateActiveThread({ title: short });
+      const el = $("thread-task-title");
+      if (el && el !== document.activeElement) el.value = short;
+    });
+
     await runAgentLoop();
   });
 
@@ -689,6 +734,18 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   $("back-btn").addEventListener("click", showHome);
+
+  // Inline-editable thread title
+  const titleEl = $("thread-task-title");
+  titleEl.addEventListener("keydown", e => {
+    if (e.key === "Enter")  { e.preventDefault(); titleEl.blur(); }
+    if (e.key === "Escape") { titleEl.blur(); }
+  });
+  titleEl.addEventListener("blur", () => {
+    const newTitle = titleEl.value.trim();
+    if (newTitle) updateActiveThread({ title: newTitle });
+    else { const { activeThread } = getState(); if (activeThread) titleEl.value = activeThread.title; }
+  });
 
   for (const [id, v] of [["perm-deny-btn","deny"],["perm-allow-btn","allow"],["perm-always-btn","always"]]) {
     $(id).addEventListener("click", () => resolvePermission(v));

@@ -42,6 +42,7 @@ export async function createThread(title) {
   const thread = {
     id:        _newId(),
     title,
+    prompt:    title,   // original task text — used as first LLM message, never changed
     createdAt: Date.now(),
     messages:  [],
     status:    "idle",
@@ -83,9 +84,9 @@ export async function updateActiveThread(patch) {
   if (!_state.activeThread) return;
   const updated = { ..._state.activeThread, ...patch };
 
-  // Sync status into the index too
+  // Sync status and title into the index
   const index = _state.threadIndex.map(m =>
-    m.id === updated.id ? { ...m, status: updated.status } : m
+    m.id === updated.id ? { ...m, status: updated.status, title: updated.title } : m
   );
 
   _state = { ..._state, activeThread: updated, threadIndex: index };

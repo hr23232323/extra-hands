@@ -573,8 +573,8 @@ header {
 .thread-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 10px 18px;
+  gap: 8px;
+  padding: 10px 14px 10px 18px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
@@ -604,18 +604,32 @@ header {
   letter-spacing: 0.06em;
 }
 .status-badge.running { background: var(--accent-bg); color: var(--accent); }
-.status-badge.done    { background: var(--green-bg);  color: var(--green); }
+.status-badge.done    { display: none; }
 .status-badge.error   { background: var(--error-bg);  color: var(--error); }
 .status-badge.idle    { display: none; }
 
-.thread-task-title {
-  padding: 16px 18px 10px;
-  font-size: 15px;
+.thread-title-input {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  outline: none;
   font-family: var(--display);
+  font-size: 14px;
   color: var(--text);
-  line-height: 1.4;
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
+  padding: 4px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: text;
+  transition: background 0.15s;
+}
+.thread-title-input:hover { background: var(--surface); }
+.thread-title-input:focus {
+  background: var(--surface);
+  box-shadow: 0 0 0 1.5px var(--border-dark);
+  cursor: text;
 }
 
 /* ── Thread compose ─────────────────────────────────────────────────────── */
