@@ -1,136 +1,145 @@
 // ── state.js — global singleton state for extra-hands ─────────────────────────
-// All persistent state lives here. UI modules import and subscribe.
-// Persistence: tauri-plugin-store → store.json (no-op fallback for browser dev).
+// Thread storage is split:
+//   threadIndex  → lightweight metadata [{id, title, createdAt, status}]
+//                  persisted in store.json under "thread_index"
+//   thread files → full content {id, title, createdAt, messages, status, result}
+//                  each in its own thread-{id}.json via separate store
 
 const invoke = window.__TAURI__?.core?.invoke ?? (() => Promise.resolve(null));
 
 // ── Internal state ─────────────────────────────────────────────────────────────
 let _state = {
-  apiKey:    null,   // string | null
-  model:     "qwen/qwen3-32b:nitro",
-  theme:     "light",
-  workspace: null,   // string | null — absolute folder path
-  threads:   [],     // Thread[]
+  apiKey:       null,
+  model:        "qwen/qwen3-32b:nitro",
+  theme:        "light",
+  workspace:    null,
+  threadIndex:  [],   // [{id, title, createdAt, status}] — always in memory
+  activeThread: null, // full thread object — loaded on demand
 };
 
-// ── Subscribers ────────────────────────────────────────────────────────────────
-const _subscribers = new Set();
+// ── Public API ─────────────────────────────────────────────────────────────────
 
-function _notify() {
-  const snapshot = getState();
-  for (const fn of _subscribers) fn(snapshot);
-}
-
-// ── Public API ────────────────────────────────────────────────────────────────
-
-/** Read a shallow copy of current state. */
 export function getState() {
-  return { ..._state, threads: [..._state.threads] };
+  return { ..._state, threadIndex: [..._state.threadIndex] };
 }
 
-/**
- * Update state and notify subscribers.
- * @param {Partial<typeof _state>} patch
- */
 export function setState(patch) {
   _state = { ..._state, ...patch };
-  _notify();
-}
-
-/**
- * Subscribe to state changes.
- * @param {(state: typeof _state) => void} fn
- * @returns {() => void} unsubscribe
- */
-export function subscribe(fn) {
-  _subscribers.add(fn);
-  return () => _subscribers.delete(fn);
 }
 
 // ── Thread helpers ─────────────────────────────────────────────────────────────
 
-/** @returns {string} */
 function _newId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 }
 
 /**
- * Create a new thread and return it.
- * @param {string} title — the user's task description
- * @returns {{ id: string, title: string, createdAt: number, messages: Array, status: string }}
+ * Create a new thread, add it to the index, persist both index and thread file.
+ * @returns full thread object
  */
-export function createThread(title) {
+export async function createThread(title) {
   const thread = {
     id:        _newId(),
     title,
     createdAt: Date.now(),
     messages:  [],
-    status:    "idle",  // idle | running | done | error
+    status:    "idle",
+    result:    null,
   };
-  _state = { ..._state, threads: [thread, ..._state.threads] };
+  const meta = { id: thread.id, title, createdAt: thread.createdAt, status: "idle" };
+
+  _state = {
+    ..._state,
+    threadIndex:  [meta, ..._state.threadIndex],
+    activeThread: thread,
+  };
   _notify();
+
+  // Persist both
+  await Promise.all([
+    invoke("set_thread_index", { index: _state.threadIndex }),
+    invoke("save_thread", { id: thread.id, thread }),
+  ]);
+
   return thread;
 }
 
 /**
- * Update a thread by id.
- * @param {string} id
- * @param {object} patch
+ * Load a full thread by id from its store file. Sets activeThread in state.
  */
-export function updateThread(id, patch) {
-  _state = {
-    ..._state,
-    threads: _state.threads.map(t => t.id === id ? { ...t, ...patch } : t),
-  };
-  _notify();
+export async function loadThread(id) {
+  const data = await invoke("get_thread", { id });
+  if (data) {
+    _state = { ..._state, activeThread: data };
+    _notify();
+    return data;
+  }
+  return null;
 }
 
 /**
- * Append a message to a thread.
- * @param {string} threadId
- * @param {{ role: string, content: string, [key: string]: any }} msg
+ * Update fields on the active thread and persist.
  */
-export function appendMessage(threadId, msg) {
-  _state = {
-    ..._state,
-    threads: _state.threads.map(t =>
-      t.id === threadId
-        ? { ...t, messages: [...t.messages, msg] }
-        : t
-    ),
-  };
+export async function updateActiveThread(patch) {
+  if (!_state.activeThread) return;
+  const updated = { ..._state.activeThread, ...patch };
+
+  // Sync status into the index too
+  const index = _state.threadIndex.map(m =>
+    m.id === updated.id ? { ...m, status: updated.status } : m
+  );
+
+  _state = { ..._state, activeThread: updated, threadIndex: index };
   _notify();
+
+  await Promise.all([
+    invoke("save_thread", { id: updated.id, thread: updated }),
+    invoke("set_thread_index", { index }),
+  ]);
+}
+
+/**
+ * Append a message to the active thread and persist.
+ */
+export async function appendMessage(msg) {
+  if (!_state.activeThread) return;
+  const updated = {
+    ..._state.activeThread,
+    messages: [..._state.activeThread.messages, msg],
+  };
+  _state = { ..._state, activeThread: updated };
+  _notify();
+  // Debounce: caller decides when to flush (avoid per-delta disk writes)
+}
+
+/** Flush active thread to disk. Call at meaningful checkpoints (done/error). */
+export async function flushActiveThread() {
+  if (!_state.activeThread) return;
+  await invoke("save_thread", { id: _state.activeThread.id, thread: _state.activeThread });
 }
 
 // ── Persistence ────────────────────────────────────────────────────────────────
 
-/** Load all persisted state from Tauri store. Call once at boot. */
 export async function loadState() {
-  const [apiKey, prefs, threads] = await Promise.all([
+  const [apiKey, prefs, threadIndex] = await Promise.all([
     invoke("get_api_key"),
     invoke("get_prefs"),
-    invoke("get_threads"),
+    invoke("get_thread_index"),
   ]);
 
   const patch = {};
-  if (apiKey)           patch.apiKey    = apiKey;
-  if (prefs?.model)     patch.model     = prefs.model;
-  if (prefs?.theme)     patch.theme     = prefs.theme;
-  if (prefs?.workspace) patch.workspace = prefs.workspace;
-  if (Array.isArray(threads) && threads.length) patch.threads = threads;
+  if (apiKey)           patch.apiKey      = apiKey;
+  if (prefs?.model)     patch.model       = prefs.model;
+  if (prefs?.theme)     patch.theme       = prefs.theme;
+  if (prefs?.workspace) patch.workspace   = prefs.workspace;
+  if (Array.isArray(threadIndex) && threadIndex.length) patch.threadIndex = threadIndex;
 
   if (Object.keys(patch).length) setState(patch);
 }
 
-/** Persist prefs to Tauri store. */
 export async function savePrefs() {
   const { model, theme, workspace } = _state;
   await invoke("set_prefs", { prefs: { model, theme, workspace } });
-}
-
-/** Persist threads to Tauri store. */
-export async function saveThreads() {
-  await invoke("set_threads", { threads: _state.threads });
 }
 
 export async function saveApiKey(key) {

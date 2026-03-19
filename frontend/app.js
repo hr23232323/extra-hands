@@ -1,15 +1,15 @@
 // ── app.js — extra-hands UI controller ────────────────────────────────────────
 import {
-  getState, setState, subscribe,
-  loadState, savePrefs, saveApiKey, saveThreads,
-  createThread, updateThread, appendMessage,
+  getState, setState,
+  loadState, savePrefs, saveApiKey,
+  createThread, loadThread, updateActiveThread,
+  appendMessage, flushActiveThread,
 } from "./state.js";
 import { orchestrateMessage } from "./search.js";
 
 // ── Tauri IPC stubs ────────────────────────────────────────────────────────────
 const invoke = window.__TAURI__?.core?.invoke ?? (() => Promise.resolve(null));
 
-// File tool stubs — real Rust commands don't exist yet; these will be wired later.
 async function listDir(path)            { return invoke("list_dir",   { path })  ?? []; }
 async function readFile(path)           { return invoke("read_file",  { path })  ?? ""; }
 async function writeFile(path, content) { return invoke("write_file", { path, content }) ?? null; }
@@ -30,20 +30,17 @@ const viewHome   = $("view-home");
 const viewThread = $("view-thread");
 
 // ── View routing ───────────────────────────────────────────────────────────────
-let _activeThreadId = null;
-
 function showHome() {
   viewHome.style.display   = "flex";
   viewThread.style.display = "none";
-  _activeThreadId = null;
-  renderThreadsList();
+  setState({ activeThread: null });
+  $("history-btn").classList.remove("active");
 }
 
-function showThread(threadId) {
+function showThread() {
   viewHome.style.display   = "none";
   viewThread.style.display = "flex";
-  _activeThreadId = threadId;
-  renderThread(threadId);
+  renderThreadView();
 }
 
 // ── Theme ──────────────────────────────────────────────────────────────────────
@@ -79,12 +76,88 @@ function toggleSettings() {
   $("settings-bar").classList.contains("open") ? hideSettings() : showSettings();
 }
 
+// ── History panel ──────────────────────────────────────────────────────────────
+function openHistory() {
+  $("history-panel").classList.add("open");
+  $("history-backdrop").classList.add("open");
+  $("history-btn").classList.add("active");
+  $("history-panel").setAttribute("aria-hidden", "false");
+  renderHistoryList($("history-search").value);
+  $("history-search").focus();
+}
+
+function closeHistory() {
+  $("history-panel").classList.remove("open");
+  $("history-backdrop").classList.remove("open");
+  $("history-btn").classList.remove("active");
+  $("history-panel").setAttribute("aria-hidden", "true");
+}
+
+function toggleHistory() {
+  $("history-panel").classList.contains("open") ? closeHistory() : openHistory();
+}
+
+function renderHistoryList(query = "") {
+  const { threadIndex, activeThread } = getState();
+  const list  = $("history-list");
+  const empty = $("history-empty");
+  const q = query.trim().toLowerCase();
+
+  const filtered = q
+    ? threadIndex.filter(t => t.title.toLowerCase().includes(q))
+    : threadIndex;
+
+  if (!filtered.length) {
+    list.innerHTML = "";
+    empty.style.display = "block";
+    return;
+  }
+  empty.style.display = "none";
+  list.innerHTML = "";
+
+  for (const meta of filtered) {
+    const item = document.createElement("div");
+    item.className = "history-item" + (activeThread?.id === meta.id ? " active" : "");
+    item.dataset.id = meta.id;
+
+    const dot = document.createElement("span");
+    dot.className = `history-item-status ${meta.status}`;
+
+    const date = document.createElement("span");
+    date.textContent = _formatDate(meta.createdAt);
+
+    const metaRow = document.createElement("div");
+    metaRow.className = "history-item-meta";
+    metaRow.appendChild(dot);
+    metaRow.appendChild(date);
+
+    const title = document.createElement("div");
+    title.className = "history-item-title";
+    title.textContent = meta.title;
+
+    item.appendChild(title);
+    item.appendChild(metaRow);
+    item.addEventListener("click", () => openExistingThread(meta.id));
+    list.appendChild(item);
+  }
+}
+
+async function openExistingThread(id) {
+  closeHistory();
+  const thread = await loadThread(id);
+  if (thread) showThread();
+}
+
+function _formatDate(ts) {
+  const d = new Date(ts);
+  return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
+}
+
 // ── Workspace ──────────────────────────────────────────────────────────────────
 function renderWorkspace() {
   const { workspace } = getState();
   const pathEl = $("workspace-path");
   if (workspace) {
-    // Show only last 2 path segments for brevity
     const parts = workspace.replace(/\\/g, "/").split("/").filter(Boolean);
     const short = parts.length > 2 ? "…/" + parts.slice(-2).join("/") : workspace;
     pathEl.textContent = short;
@@ -95,7 +168,6 @@ function renderWorkspace() {
     pathEl.title = "";
     pathEl.classList.remove("has-path");
   }
-  // Update run button hint
   updateRunButton();
 }
 
@@ -108,13 +180,12 @@ async function handlePickFolder() {
   }
 }
 
-// ── Compose area ───────────────────────────────────────────────────────────────
+// ── Compose ────────────────────────────────────────────────────────────────────
 function updateRunButton() {
   const { workspace } = getState();
   const text = $("task-input").value.trim();
   const btn  = $("run-btn");
   const hint = $("compose-hint");
-
   if (!workspace) {
     hint.textContent = "select a workspace folder first";
     btn.disabled = true;
@@ -129,7 +200,6 @@ function updateRunButton() {
 
 // ── Toast ──────────────────────────────────────────────────────────────────────
 let _toastTimer = null;
-
 function showToast(msg) {
   let toast = document.querySelector(".toast");
   if (!toast) {
@@ -143,71 +213,21 @@ function showToast(msg) {
   _toastTimer = setTimeout(() => toast.classList.remove("show"), 3500);
 }
 
-// ── Recent threads ─────────────────────────────────────────────────────────────
-function renderThreadsList() {
-  const { threads } = getState();
-  const section = $("threads-section");
-  const list    = $("threads-list");
-
-  if (!threads.length) {
-    section.style.display = "none";
-    return;
-  }
-  section.style.display = "block";
-  list.innerHTML = "";
-
-  for (const t of threads) {
-    const item = document.createElement("div");
-    item.className = "thread-item";
-    item.dataset.id = t.id;
-
-    const dot = document.createElement("div");
-    dot.className = `thread-item-dot status-${t.status}`;
-
-    const body = document.createElement("div");
-    body.className = "thread-item-body";
-
-    const title = document.createElement("div");
-    title.className = "thread-item-title";
-    title.textContent = t.title;
-
-    const meta = document.createElement("div");
-    meta.className = "thread-item-meta";
-    meta.textContent = _relativeTime(t.createdAt) + " · " + t.status;
-
-    body.appendChild(title);
-    body.appendChild(meta);
-    item.appendChild(dot);
-    item.appendChild(body);
-
-    item.addEventListener("click", () => showThread(t.id));
-    list.appendChild(item);
-  }
-}
-
-function _relativeTime(ts) {
-  const diff = Date.now() - ts;
-  if (diff < 60_000) return "just now";
-  if (diff < 3_600_000) return Math.floor(diff / 60_000) + "m ago";
-  return Math.floor(diff / 3_600_000) + "h ago";
-}
-
 // ── Thread view ────────────────────────────────────────────────────────────────
-function renderThread(threadId) {
-  const { threads } = getState();
-  const thread = threads.find(t => t.id === threadId);
-  if (!thread) { showHome(); return; }
+function renderThreadView() {
+  const { activeThread } = getState();
+  if (!activeThread) { showHome(); return; }
 
-  $("thread-task-title").textContent = thread.title;
+  $("thread-task-title").textContent = activeThread.title;
 
   const badge = $("thread-status-badge");
-  badge.className = `status-badge ${thread.status}`;
-  badge.textContent = thread.status === "idle" ? "" : thread.status;
+  badge.className = `status-badge ${activeThread.status}`;
+  badge.textContent = activeThread.status === "idle" ? "" : activeThread.status;
 
   const feed = $("agent-feed");
   feed.innerHTML = "";
 
-  for (const msg of thread.messages) {
+  for (const msg of activeThread.messages) {
     if (msg.type === "tool") {
       feed.appendChild(_makeToolChip(msg));
     } else if (msg.type === "text") {
@@ -218,8 +238,7 @@ function renderThread(threadId) {
     }
   }
 
-  // If running, last text bubble may still be streaming — show cursor
-  if (thread.status === "running") {
+  if (activeThread.status === "running") {
     const last = feed.lastElementChild;
     if (last?.classList.contains("feed-text")) {
       const cursor = document.createElement("span");
@@ -229,8 +248,8 @@ function renderThread(threadId) {
   }
 
   const resultBox = $("agent-result");
-  if (thread.status === "done" && thread.result) {
-    $("result-content").textContent = thread.result;
+  if (activeThread.status === "done" && activeThread.result) {
+    $("result-content").textContent = activeThread.result;
     resultBox.style.display = "block";
   } else {
     resultBox.style.display = "none";
@@ -242,9 +261,7 @@ function _makeToolChip({ toolName, toolArg }) {
     read_file:  `<svg class="tool-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="1" width="10" height="13" rx="1"/><line x1="5" y1="5" x2="9" y2="5"/><line x1="5" y1="8" x2="9" y2="8"/></svg>`,
     write_file: `<svg class="tool-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6z"/><polyline points="10 2 10 6 14 6"/></svg>`,
     list_dir:   `<svg class="tool-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 4h4l2 2h8v8H1z"/></svg>`,
-    web_search: `<svg class="tool-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="5"/><line x1="11" y1="11" x2="15" y2="15"/></svg>`,
   };
-
   const chip = document.createElement("div");
   chip.className = "tool-chip";
   chip.innerHTML = (icons[toolName] ?? "") +
@@ -259,14 +276,8 @@ const FILE_TOOLS = [
     type: "function",
     function: {
       name: "list_dir",
-      description: "List the files and subdirectories in a directory.",
-      parameters: {
-        type: "object",
-        properties: {
-          path: { type: "string", description: "Absolute path to the directory." },
-        },
-        required: ["path"],
-      },
+      description: "List files and subdirectories in a directory.",
+      parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"] },
     },
   },
   {
@@ -274,13 +285,7 @@ const FILE_TOOLS = [
     function: {
       name: "read_file",
       description: "Read the full contents of a file.",
-      parameters: {
-        type: "object",
-        properties: {
-          path: { type: "string", description: "Absolute path to the file." },
-        },
-        required: ["path"],
-      },
+      parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"] },
     },
   },
   {
@@ -290,23 +295,22 @@ const FILE_TOOLS = [
       description: "Write or overwrite a file with the given content.",
       parameters: {
         type: "object",
-        properties: {
-          path:    { type: "string", description: "Absolute path to the file." },
-          content: { type: "string", description: "Content to write." },
-        },
+        properties: { path: { type: "string" }, content: { type: "string" } },
         required: ["path", "content"],
       },
     },
   },
 ];
 
-async function executeTool(toolName, argsStr, threadId) {
+async function executeTool(toolName, argsStr) {
   let args;
   try { args = JSON.parse(argsStr); } catch { return "Error: could not parse tool args."; }
 
-  // Record tool call in feed
-  appendMessage(threadId, { type: "tool", toolName, toolArg: args.path ?? args.query ?? "" });
-  if (_activeThreadId === threadId) renderThread(threadId);
+  const { activeThread } = getState();
+  if (activeThread) {
+    await appendMessage({ type: "tool", toolName, toolArg: args.path ?? "" });
+    if (viewThread.style.display !== "none") renderThreadView();
+  }
 
   if (toolName === "list_dir")   return JSON.stringify(await listDir(args.path));
   if (toolName === "read_file")  return await readFile(args.path);
@@ -314,125 +318,98 @@ async function executeTool(toolName, argsStr, threadId) {
   return "Error: unknown tool.";
 }
 
-async function runAgentLoop(threadId) {
-  const { apiKey, model, workspace } = getState();
+async function runAgentLoop() {
+  const { apiKey, model, workspace, activeThread } = getState();
+  if (!activeThread) return;
   if (!apiKey) { showToast("Add your OpenRouter API key in settings."); return; }
 
-  updateThread(threadId, { status: "running" });
-
-  const { threads } = getState();
-  const thread = threads.find(t => t.id === threadId);
+  await updateActiveThread({ status: "running" });
+  if (viewThread.style.display !== "none") renderThreadView();
 
   const systemPrompt = `You are extra-hands, an autonomous file-based task agent.
 The user has granted you access to their workspace at: ${workspace ?? "(none)"}
 You can call list_dir, read_file, and write_file to complete the task.
 Work autonomously. When done, summarize what you did and what files were created or modified.`;
 
-  // Seed messages with the user task
-  const messages = [{ role: "user", content: thread.title }];
+  const messages = [{ role: "user", content: activeThread.title }];
 
-  // Create a streaming text node
-  let streamEl = null;
-  let fullText  = "";
-
-  function ensureStreamEl() {
-    if (!streamEl) {
-      streamEl = document.createElement("div");
-      streamEl.className = "feed-text";
-      $("agent-feed")?.appendChild(streamEl);
-    }
-  }
+  let streamEl     = null;
+  let streamText   = null;
+  let streamCursor = null;
+  let fullText     = "";
+  let lastResult   = null;
 
   function onDelta(delta) {
     fullText += delta;
-    if (_activeThreadId === threadId) {
-      ensureStreamEl();
-      const cursor = streamEl.querySelector(".cursor");
-      if (cursor) cursor.remove();
-      streamEl.textContent = fullText;
-      const c = document.createElement("span");
-      c.className = "cursor";
-      streamEl.appendChild(c);
-      $("agent-feed").scrollTop = $("agent-feed").scrollHeight;
+    if (viewThread.style.display === "none") return;
+    const feed = $("agent-feed");
+    if (!streamEl) {
+      streamEl = document.createElement("div");
+      streamEl.className = "feed-text";
+      streamText = document.createTextNode("");
+      streamCursor = document.createElement("span");
+      streamCursor.className = "cursor";
+      streamEl.appendChild(streamText);
+      streamEl.appendChild(streamCursor);
+      feed.appendChild(streamEl);
     }
+    streamText.textContent = fullText;
+    feed.scrollTop = feed.scrollHeight;
   }
 
-  // Multi-turn agentic loop (max 8 turns to prevent runaway)
-  const MAX_TURNS = 8;
-  let turn = 0;
-  let lastResult = null;
-
   try {
-    while (turn < MAX_TURNS) {
-      turn++;
-      fullText = "";
-      streamEl = null;
+    for (let turn = 0; turn < 8; turn++) {
+      fullText     = "";
+      streamEl     = null;
+      streamText   = null;
+      streamCursor = null;
 
-      // Include tool call history in messages for next turn
       const result = await orchestrateMessage({
-        apiKey,
-        model,
-        messages,
-        systemPrompt,
+        apiKey, model, messages, systemPrompt,
         tools: FILE_TOOLS,
         onDelta,
         onToolCall: async (toolCall) => {
-          const toolResult = await executeTool(toolCall.name, toolCall.args, threadId);
-
-          // Append tool exchange to messages so model sees results
+          const toolResult = await executeTool(toolCall.name, toolCall.args);
           messages.push({
-            role: "assistant",
-            content: null,
-            tool_calls: [{
-              id: toolCall.id,
-              type: "function",
-              function: { name: toolCall.name, arguments: toolCall.args },
-            }],
+            role: "assistant", content: null,
+            tool_calls: [{ id: toolCall.id, type: "function",
+              function: { name: toolCall.name, arguments: toolCall.args } }],
           });
-          messages.push({
-            role: "tool",
-            tool_call_id: toolCall.id,
-            content: String(toolResult),
-          });
-
+          messages.push({ role: "tool", tool_call_id: toolCall.id, content: String(toolResult) });
           return toolResult;
         },
       });
 
+      streamCursor?.remove();
+
       if (result.fullText) {
-        // Remove streaming cursor
-        streamEl?.querySelector(".cursor")?.remove();
-        appendMessage(threadId, { type: "text", content: result.fullText });
+        await appendMessage({ type: "text", content: result.fullText });
         messages.push({ role: "assistant", content: result.fullText });
         lastResult = result.fullText;
       }
 
-      // If no tool was called, the model is done
       if (!result.toolCall) break;
     }
 
-    updateThread(threadId, { status: "done", result: lastResult });
-    await saveThreads();
+    await updateActiveThread({ status: "done", result: lastResult });
   } catch (err) {
     console.error("[extra-hands] agent error:", err);
-    updateThread(threadId, { status: "error" });
-    appendMessage(threadId, { type: "text", content: `Error: ${err.message}` });
-    await saveThreads();
+    await appendMessage({ type: "text", content: `Error: ${err.message}` });
+    await updateActiveThread({ status: "error" });
     showToast(err.message);
   }
 
-  if (_activeThreadId === threadId) renderThread(threadId);
-  renderThreadsList();
+  await flushActiveThread();
+  if (viewThread.style.display !== "none") renderThreadView();
 }
 
 // ── Boot ───────────────────────────────────────────────────────────────────────
 async function init() {
   await loadState();
-  const { theme, model, apiKey } = getState();
+  const { theme, model } = getState();
 
   applyTheme(theme);
 
-  // Populate model selector
   const sel = $("model-select");
   for (const m of MODELS) {
     const opt = document.createElement("option");
@@ -448,38 +425,30 @@ async function init() {
     savePrefs();
   });
 
-  // Show settings if no API key
-  if (!apiKey) showSettings();
-
   renderWorkspace();
-  renderThreadsList();
 }
 
-// ── Wire up events ─────────────────────────────────────────────────────────────
+// ── Wire events ────────────────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", () => {
-  // Header
   $("theme-btn").addEventListener("click", toggleTheme);
+  $("history-btn").addEventListener("click", toggleHistory);
+  $("history-close-btn").addEventListener("click", closeHistory);
+  $("history-backdrop").addEventListener("click", closeHistory);
+  $("new-btn").addEventListener("click", () => { closeHistory(); showHome(); });
   $("settings-btn").addEventListener("click", toggleSettings);
 
-  // Settings
-  $("save-key-btn").addEventListener("click", async () => {
+  $("history-search").addEventListener("input", e => renderHistoryList(e.target.value));
+
+  async function saveKeyAndHide() {
     const key = $("api-key-input").value.trim();
     if (key) { await saveApiKey(key); hideSettings(); }
-  });
-  $("api-key-input").addEventListener("keydown", async (e) => {
-    if (e.key === "Enter") {
-      const key = e.target.value.trim();
-      if (key) { await saveApiKey(key); hideSettings(); }
-    }
-  });
+  }
+  $("save-key-btn").addEventListener("click", saveKeyAndHide);
+  $("api-key-input").addEventListener("keydown", e => { if (e.key === "Enter") saveKeyAndHide(); });
 
-  // Workspace
   $("pick-folder-btn").addEventListener("click", handlePickFolder);
-
-  // Compose
   $("task-input").addEventListener("input", updateRunButton);
 
-  // Example chips — fill task input
   document.querySelectorAll(".example-chip").forEach(chip => {
     chip.addEventListener("click", () => {
       $("task-input").value = chip.dataset.task;
@@ -488,28 +457,24 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  // Run task
   $("run-btn").addEventListener("click", async () => {
     const title = $("task-input").value.trim();
     if (!title) return;
-
-    const thread = createThread(title);
+    await createThread(title);
     $("task-input").value = "";
     updateRunButton();
-    saveThreads(); // fire-and-forget — persist immediately so the thread survives a crash
-
-    showThread(thread.id);
-    await runAgentLoop(thread.id);
+    showThread();
+    await runAgentLoop();
   });
 
-  // Back button
   $("back-btn").addEventListener("click", showHome);
 
-  // Close settings when clicking outside
+  // Close panels when clicking outside
   document.addEventListener("click", (e) => {
     const bar = $("settings-bar");
-    const btn = $("settings-btn");
-    if (bar.classList.contains("open") && !bar.contains(e.target) && !btn.contains(e.target)) {
+    if (bar.classList.contains("open") &&
+        !bar.contains(e.target) &&
+        !$("settings-btn").contains(e.target)) {
       hideSettings();
     }
   });

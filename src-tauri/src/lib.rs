@@ -52,10 +52,12 @@ fn set_prefs(app: tauri::AppHandle, prefs: Prefs) {
     }
 }
 
+// ── Thread index (lightweight metadata only) ──────────────────────────────────
+
 #[tauri::command]
-fn get_threads(app: tauri::AppHandle) -> serde_json::Value {
+fn get_thread_index(app: tauri::AppHandle) -> serde_json::Value {
     if let Ok(store) = app.store("store.json") {
-        if let Some(v) = store.get("threads") {
+        if let Some(v) = store.get("thread_index") {
             return v.clone();
         }
     }
@@ -63,9 +65,35 @@ fn get_threads(app: tauri::AppHandle) -> serde_json::Value {
 }
 
 #[tauri::command]
-fn set_threads(app: tauri::AppHandle, threads: serde_json::Value) {
+fn set_thread_index(app: tauri::AppHandle, index: serde_json::Value) {
     if let Ok(store) = app.store("store.json") {
-        store.set("threads", threads);
+        store.set("thread_index", index);
+        let _ = store.save();
+    }
+}
+
+// ── Per-thread content (full messages, one file each) ─────────────────────────
+
+fn thread_store_name(id: &str) -> String {
+    format!("thread-{}.json", id)
+}
+
+#[tauri::command]
+fn get_thread(app: tauri::AppHandle, id: String) -> serde_json::Value {
+    let store_name = thread_store_name(&id);
+    if let Ok(store) = app.store(&store_name) {
+        if let Some(v) = store.get("data") {
+            return v.clone();
+        }
+    }
+    serde_json::Value::Null
+}
+
+#[tauri::command]
+fn save_thread(app: tauri::AppHandle, id: String, thread: serde_json::Value) {
+    let store_name = thread_store_name(&id);
+    if let Ok(store) = app.store(&store_name) {
+        store.set("data", thread);
         let _ = store.save();
     }
 }
@@ -113,8 +141,10 @@ pub fn run() {
             set_api_key,
             get_prefs,
             set_prefs,
-            get_threads,
-            set_threads,
+            get_thread_index,
+            set_thread_index,
+            get_thread,
+            save_thread,
         ])
         .setup(|app| {
             let _ = app.store("store.json")?;
