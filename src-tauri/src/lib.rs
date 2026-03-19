@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
 use tauri::{
     image::Image,
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -6,6 +7,8 @@ use tauri::{
 };
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_store::StoreExt;
+
+struct DialogOpen(Arc<AtomicBool>);
 
 const WINDOW_WIDTH: f64 = 480.0;
 const PADDING: f64 = 8.0;
@@ -105,10 +108,18 @@ fn save_thread(app: tauri::AppHandle, id: String, thread: serde_json::Value) {
 
 #[tauri::command]
 async fn pick_folder(app: tauri::AppHandle) -> Option<String> {
+    app.state::<DialogOpen>().0.store(true, Ordering::Relaxed);
+    let (tx, rx) = std::sync::mpsc::channel();
     app.dialog()
         .file()
-        .blocking_pick_folder()
-        .map(|f| f.to_string())
+        .pick_folder(move |folder| { let _ = tx.send(folder); });
+    let result = tauri::async_runtime::spawn_blocking(move || rx.recv().ok().flatten())
+        .await
+        .ok()
+        .flatten()
+        .map(|f| f.to_string());
+    app.state::<DialogOpen>().0.store(false, Ordering::Relaxed);
+    result
 }
 
 #[tauri::command]
@@ -192,6 +203,7 @@ pub fn run() {
         ])
         .setup(|app| {
             let _ = app.store("store.json")?;
+            app.manage(DialogOpen(Arc::new(AtomicBool::new(false))));
 
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
@@ -217,11 +229,14 @@ pub fn run() {
                 .build(app)?;
 
             let window = app.get_webview_window("main").unwrap();
+            let dialog_open = app.state::<DialogOpen>().0.clone();
             window.on_window_event({
                 let window = window.clone();
                 move |event| {
                     if let tauri::WindowEvent::Focused(false) = event {
-                        let _ = window.hide();
+                        if !dialog_open.load(Ordering::Relaxed) {
+                            let _ = window.hide();
+                        }
                     }
                 }
             });

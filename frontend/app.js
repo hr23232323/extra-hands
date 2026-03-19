@@ -7,6 +7,7 @@ import {
   addTrustedFolder,
 } from "./state.js";
 import { orchestrateMessage } from "./search.js";
+import * as smd from "https://cdn.jsdelivr.net/npm/streaming-markdown/smd.min.js";
 
 // ── Tauri IPC stubs ────────────────────────────────────────────────────────────
 const invoke = window.__TAURI__?.core?.invoke ?? (() => Promise.resolve(null));
@@ -16,8 +17,27 @@ async function readFile(path)           { return invoke("read_file",  { path });
 async function writeFile(path, content) { return invoke("write_file", { path, content }); }
 async function pickFolder()             { return invoke("pick_folder"); }
 
+const normPath = p => p.replace(/\\/g, "/");
+
+// Box any path (relative, absolute, or already workspace-prefixed) into the
+// workspace root. Neutralizes path traversal (../../etc/passwd → workspace/etc/passwd).
+function boxPath(workspace, rawPath) {
+  if (!workspace) return normPath(rawPath);
+  let rel = normPath(rawPath);
+  // Strip workspace prefix or any leading slash so we always treat as relative
+  if (rel.startsWith(workspace + "/")) rel = rel.slice(workspace.length + 1);
+  else if (rel.startsWith("/"))        rel = rel.slice(1);
+  // Resolve . and .. segments
+  const parts = [];
+  for (const seg of rel.split("/")) {
+    if (seg === "..") parts.pop();
+    else if (seg && seg !== ".") parts.push(seg);
+  }
+  return `${workspace}/${parts.join("/")}`;
+}
+
 function _parentDir(path) {
-  const norm = path.replace(/\\/g, "/");
+  const norm = normPath(path);
   const i = norm.lastIndexOf("/");
   return i > 0 ? norm.slice(0, i) : norm;
 }
@@ -31,21 +51,121 @@ function showPermissionPrompt(toolName, path) {
     $("perm-tool").textContent = toolName;
     $("perm-path").textContent = path;
     $("permission-prompt").style.display = "flex";
-    $("agent-feed").scrollTop = $("agent-feed").scrollHeight;
+    requestAnimationFrame(() => { $("agent-feed").scrollTop = $("agent-feed").scrollHeight; });
   });
 }
 
-function hidePermissionPrompt() {
+function resolvePermission(decision) {
   $("permission-prompt").style.display = "none";
+  _permResolve?.(decision);
   _permResolve = null;
 }
 
 async function checkPermission(toolName, path) {
   const { workspace, trustedFolders } = getState();
-  const norm = path.replace(/\\/g, "/");
-  if (workspace && norm.startsWith(workspace.replace(/\\/g, "/"))) return "allow";
-  if (trustedFolders.some(f => norm.startsWith(f.replace(/\\/g, "/")))) return "allow";
+  const norm = normPath(path);
+  if (workspace && norm.startsWith(workspace)) return "allow";
+  if (trustedFolders.some(f => norm.startsWith(f))) return "allow";
   return showPermissionPrompt(toolName, path);
+}
+
+// ── Chat UI helpers ────────────────────────────────────────────────────────────
+
+function escapeHtml(s) {
+  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+function _renderMarkdown(container, text) {
+  const parser = smd.parser(smd.default_renderer(container));
+  smd.parser_write(parser, text);
+  smd.parser_end(parser);
+}
+
+function _buildStepHtml(toolName, toolArg) {
+  return `<span class="thinking-step-arrow">↳</span><span class="thinking-step-text">${escapeHtml(toolName)}${toolArg ? ` <em>${escapeHtml(toolArg)}</em>` : ""}</span>`;
+}
+
+function _attachToolsReplay(header, tools) {
+  if (!tools.length) return;
+  const btn = document.createElement("button");
+  btn.className = "msg-agent-toggle";
+  btn.innerHTML = `tools <span class="agent-toggle-arrow">▸</span>`;
+  const replay = document.createElement("div");
+  replay.className = "thinking-replay";
+  for (const t of tools) {
+    const step = document.createElement("div");
+    step.className = "thinking-step";
+    step.innerHTML = _buildStepHtml(t.toolName, t.toolArg);
+    replay.appendChild(step);
+  }
+  btn.addEventListener("click", () => {
+    const open = replay.classList.toggle("open");
+    btn.classList.toggle("open", open);
+  });
+  header.appendChild(btn);
+  header.appendChild(replay);
+}
+
+function _makeChatMsg(role, text, tools = []) {
+  const msg = document.createElement("div");
+  msg.className = `message ${role}`;
+  const body = document.createElement("div");
+  body.className = "msg-body";
+  if (role === "assistant") {
+    const header = document.createElement("div");
+    header.className = "msg-header";
+    _attachToolsReplay(header, tools);
+    body.appendChild(header);
+  }
+  const contentEl = document.createElement("div");
+  contentEl.className = "bubble-content";
+  if (text) {
+    if (role === "user") contentEl.textContent = text;
+    else _renderMarkdown(contentEl, text);
+  }
+  body.appendChild(contentEl);
+  msg.appendChild(body);
+  return msg;
+}
+
+function createThinkingIndicator() {
+  const el = document.createElement("div");
+  el.className = "thinking";
+  el.innerHTML = `
+    <div class="thinking-header">
+      <span class="thinking-label">working</span>
+      <div class="thinking-dots"><span></span><span></span><span></span></div>
+    </div>
+    <div class="thinking-log"></div>
+  `;
+  return el;
+}
+
+function addThinkingStep(thinkingEl, toolName, toolArg) {
+  const log = thinkingEl.querySelector(".thinking-log");
+  if (!log) return;
+  const step = document.createElement("div");
+  step.className = "thinking-step";
+  step.innerHTML = _buildStepHtml(toolName, toolArg);
+  log.appendChild(step);
+}
+
+function collapseThinking(thinkingEl, onDone) {
+  const h = thinkingEl.getBoundingClientRect().height;
+  thinkingEl.style.height = h + "px";
+  thinkingEl.style.overflow = "hidden";
+  thinkingEl.style.transition = "height 0.28s ease, opacity 0.2s ease, margin-bottom 0.28s ease";
+  requestAnimationFrame(() => {
+    thinkingEl.style.height = "0";
+    thinkingEl.style.opacity = "0";
+    thinkingEl.style.marginBottom = "0";
+  });
+  let done = false;
+  const cleanup = () => { if (done) return; done = true; thinkingEl.remove(); onDone(); };
+  const timer = setTimeout(cleanup, 400);
+  thinkingEl.addEventListener("transitionend", function h(e) {
+    if (e.propertyName === "height") { clearTimeout(timer); thinkingEl.removeEventListener("transitionend", h); cleanup(); }
+  });
 }
 
 // ── Models ─────────────────────────────────────────────────────────────────────
@@ -194,7 +314,7 @@ function renderWorkspace() {
   const { workspace } = getState();
   const pathEl = $("workspace-path");
   if (workspace) {
-    const parts = workspace.replace(/\\/g, "/").split("/").filter(Boolean);
+    const parts = workspace.split("/").filter(Boolean);
     const short = parts.length > 2 ? "…/" + parts.slice(-2).join("/") : workspace;
     pathEl.textContent = short;
     pathEl.title = workspace;
@@ -210,7 +330,7 @@ function renderWorkspace() {
 async function handlePickFolder() {
   const path = await pickFolder();
   if (path) {
-    setState({ workspace: path });
+    setState({ workspace: normPath(path) });
     await savePrefs();
     renderWorkspace();
   }
@@ -250,64 +370,43 @@ function showToast(msg) {
 }
 
 // ── Thread view ────────────────────────────────────────────────────────────────
+function _setStatusBadge(status) {
+  const badge = $("thread-status-badge");
+  badge.className = `status-badge ${status}`;
+  badge.textContent = status === "idle" ? "" : status;
+}
+
 function renderThreadView() {
   const { activeThread } = getState();
   if (!activeThread) { showHome(); return; }
 
   $("thread-task-title").textContent = activeThread.title;
-
-  const badge = $("thread-status-badge");
-  badge.className = `status-badge ${activeThread.status}`;
-  badge.textContent = activeThread.status === "idle" ? "" : activeThread.status;
+  _setStatusBadge(activeThread.status);
 
   const feed = $("agent-feed");
   feed.innerHTML = "";
+  $("agent-result").style.display = "none";
 
+  // User task bubble
+  feed.appendChild(_makeChatMsg("user", activeThread.title));
+
+  // Group tool calls before each text message into a collapsible tools block
+  let pendingTools = [];
   for (const msg of activeThread.messages) {
     if (msg.type === "tool") {
-      feed.appendChild(_makeToolChip(msg));
+      pendingTools.push(msg);
     } else if (msg.type === "text") {
-      const el = document.createElement("div");
-      el.className = "feed-text";
-      el.textContent = msg.content;
-      feed.appendChild(el);
+      feed.appendChild(_makeChatMsg("assistant", msg.content, pendingTools));
+      pendingTools = [];
     }
   }
 
-  if (activeThread.status === "running") {
-    const last = feed.lastElementChild;
-    if (last?.classList.contains("feed-text")) {
-      const cursor = document.createElement("span");
-      cursor.className = "cursor";
-      last.appendChild(cursor);
-    }
-  }
-
-  const resultBox = $("agent-result");
-  if (activeThread.status === "done" && activeThread.result) {
-    $("result-content").textContent = activeThread.result;
-    resultBox.style.display = "block";
-  } else {
-    resultBox.style.display = "none";
-  }
-}
-
-const _TOOL_ICONS = {
-  read_file:  `<svg class="tool-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="1" width="10" height="13" rx="1"/><line x1="5" y1="5" x2="9" y2="5"/><line x1="5" y1="8" x2="9" y2="8"/></svg>`,
-  write_file: `<svg class="tool-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6z"/><polyline points="10 2 10 6 14 6"/></svg>`,
-  list_dir:   `<svg class="tool-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 4h4l2 2h8v8H1z"/></svg>`,
-};
-
-function _makeToolChip({ toolName, toolArg }) {
-  const chip = document.createElement("div");
-  chip.className = "tool-chip";
-  chip.innerHTML = (_TOOL_ICONS[toolName] ?? "") +
-    `<span class="tool-name">${toolName}</span>` +
-    (toolArg ? `<span class="tool-arg">${toolArg}</span>` : "");
-  return chip;
+  feed.scrollTop = feed.scrollHeight;
 }
 
 // ── Agent loop ─────────────────────────────────────────────────────────────────
+let _liveThinkingEl = null;
+let _liveTools = [];
 const FILE_TOOLS = [
   {
     type: "function",
@@ -343,114 +442,167 @@ async function executeTool(toolName, argsStr) {
   let args;
   try { args = JSON.parse(argsStr); } catch { return "Error: could not parse tool args."; }
 
-  const path = args.path ?? "";
+  const { workspace } = getState();
+  if (!workspace) return "Error: no workspace selected.";
+  const path = boxPath(workspace, args.path ?? "");
+
   const decision = await checkPermission(toolName, path);
 
   if (decision === "deny") return "Error: access denied by user.";
 
   if (decision === "always") {
-    addTrustedFolder(toolName === "list_dir" ? path : _parentDir(path));
+    addTrustedFolder(toolName === "list_dir" ? normPath(path) : _parentDir(path));
   }
 
   const { activeThread } = getState();
   if (activeThread) {
     await appendMessage({ type: "tool", toolName, toolArg: path });
-    if (viewThread.style.display !== "none") renderThreadView();
+    if (_liveThinkingEl) {
+      addThinkingStep(_liveThinkingEl, toolName, path);
+      _liveTools.push({ toolName, toolArg: path });
+      $("agent-feed").scrollTop = $("agent-feed").scrollHeight;
+    }
   }
 
   try {
     if (toolName === "list_dir")   return JSON.stringify(await listDir(path));
     if (toolName === "read_file")  return await readFile(path);
-    if (toolName === "write_file") { await writeFile(path, args.content ?? ""); return "ok"; }
+    if (toolName === "write_file") {
+      if (args.content === undefined) return "Error: write_file requires content.";
+      await writeFile(path, args.content);
+      return "ok";
+    }
     return "Error: unknown tool.";
   } catch (err) {
     return `Error: ${err.message ?? err}`;
   }
 }
 
-async function runAgentLoop() {
-  const { apiKey, model, workspace, activeThread } = getState();
+function _setThreadComposeEnabled(enabled) {
+  $("thread-input").disabled = !enabled;
+  $("thread-send-btn").disabled = !enabled || !$("thread-input").value.trim();
+}
+
+function _buildMessages(thread) {
+  const messages = [{ role: "user", content: thread.title }];
+  for (const msg of thread.messages) {
+    if (msg.type === "text")       messages.push({ role: "assistant", content: msg.content });
+    else if (msg.type === "user")  messages.push({ role: "user",      content: msg.content });
+  }
+  return messages;
+}
+
+async function runAgentLoop(isContinuation = false) {
+  const { apiKey, model, workspace } = getState();
+  let { activeThread } = getState();
   if (!activeThread) return;
   if (!apiKey) { showToast("Add your OpenRouter API key in settings."); return; }
 
+  _setThreadComposeEnabled(false);
   await updateActiveThread({ status: "running" });
-  if (viewThread.style.display !== "none") renderThreadView();
+  activeThread = getState().activeThread;
 
-  const systemPrompt = `You are extra-hands, an autonomous file-based task agent.
-The user has granted you access to their workspace at: ${workspace ?? "(none)"}
+  // Build the live chat feed
+  const feed = $("agent-feed");
+  if (!isContinuation) {
+    feed.innerHTML = "";
+    feed.appendChild(_makeChatMsg("user", activeThread.title));
+  }
+
+  const thinkingEl = createThinkingIndicator();
+  feed.appendChild(thinkingEl);
+  _liveThinkingEl = thinkingEl;
+  _liveTools = [];
+  feed.scrollTop = feed.scrollHeight;
+
+  const systemPrompt = `You are extra-hands, an autonomous file-based task agent running inside the user's workspace.
+Use relative paths for all file operations (e.g. "report.txt", "subdir/data.csv"). The system will resolve them to the correct location automatically.
 You can call list_dir, read_file, and write_file to complete the task.
 Work autonomously. When done, summarize what you did and what files were created or modified.`;
 
-  const messages = [{ role: "user", content: activeThread.title }];
+  const messages = _buildMessages(activeThread);
 
-  let streamEl     = null;
-  let streamText   = null;
-  let streamCursor = null;
-  let fullText     = "";
-  let lastResult   = null;
+  // Streaming state — persists across turns, reset only after a tool call
+  let contentEl = null, mdParser = null, observer = null;
+  let lastResult = null, scrollPending = false;
 
   function onDelta(delta) {
-    fullText += delta;
     if (viewThread.style.display === "none") return;
-    const feed = $("agent-feed");
-    if (!streamEl) {
-      streamEl = document.createElement("div");
-      streamEl.className = "feed-text";
-      streamText = document.createTextNode("");
-      streamCursor = document.createElement("span");
-      streamCursor.className = "cursor";
-      streamEl.appendChild(streamText);
-      streamEl.appendChild(streamCursor);
-      feed.appendChild(streamEl);
+    if (!contentEl) {
+      // First text — collapse thinking, start assistant bubble
+      _liveThinkingEl = null;
+      collapseThinking(thinkingEl, () => {});
+      const msgEl = _makeChatMsg("assistant", "", _liveTools);
+      feed.appendChild(msgEl);
+      contentEl = msgEl.querySelector(".bubble-content");
+      mdParser = smd.parser(smd.default_renderer(contentEl));
+      observer = new MutationObserver(mutations => {
+        for (const m of mutations)
+          for (const node of m.addedNodes)
+            if (node.nodeType === Node.ELEMENT_NODE) node.classList.add("chunk-in");
+      });
+      observer.observe(contentEl, { childList: true });
     }
-    streamText.textContent = fullText;
-    feed.scrollTop = feed.scrollHeight;
+    smd.parser_write(mdParser, delta);
+    if (!scrollPending) {
+      scrollPending = true;
+      requestAnimationFrame(() => { feed.scrollTop = feed.scrollHeight; scrollPending = false; });
+    }
+  }
+
+  function resetStreamState() {
+    if (observer) { observer.disconnect(); observer = null; }
+    if (mdParser) { smd.parser_end(mdParser); mdParser = null; }
+    contentEl = null;
+    _liveTools = [];
   }
 
   try {
     for (let turn = 0; turn < 8; turn++) {
-      fullText     = "";
-      streamEl     = null;
-      streamText   = null;
-      streamCursor = null;
-
       const result = await orchestrateMessage({
         apiKey, model, messages, systemPrompt,
         tools: FILE_TOOLS,
         onDelta,
-        onToolCall: async (toolCall) => {
-          const toolResult = await executeTool(toolCall.name, toolCall.args);
-          messages.push({
-            role: "assistant", content: null,
-            tool_calls: [{ id: toolCall.id, type: "function",
-              function: { name: toolCall.name, arguments: toolCall.args } }],
-          });
-          messages.push({ role: "tool", tool_call_id: toolCall.id, content: String(toolResult) });
-          return toolResult;
-        },
       });
 
-      streamCursor?.remove();
+      if (result.toolCall) {
+        // Reset streaming state so next turn's text starts a fresh bubble
+        resetStreamState();
 
-      if (result.fullText) {
-        await appendMessage({ type: "text", content: result.fullText });
-        messages.push({ role: "assistant", content: result.fullText });
-        lastResult = result.fullText;
+        messages.push({
+          role: "assistant", content: result.fullText || null,
+          tool_calls: [{ id: result.toolCall.id, type: "function",
+            function: { name: result.toolCall.name, arguments: result.toolCall.args } }],
+        });
+        const toolResult = await executeTool(result.toolCall.name, result.toolCall.args);
+        messages.push({ role: "tool", tool_call_id: result.toolCall.id, content: String(toolResult) });
+      } else {
+        if (result.fullText) {
+          await appendMessage({ type: "text", content: result.fullText });
+          messages.push({ role: "assistant", content: result.fullText });
+          lastResult = result.fullText;
+        }
+        break;
       }
-
-      if (!result.toolCall) break;
     }
 
     await updateActiveThread({ status: "done", result: lastResult });
   } catch (err) {
     console.error("[extra-hands] agent error:", err);
-    await appendMessage({ type: "text", content: `Error: ${err.message}` });
+    _liveThinkingEl = null;
+    if (thinkingEl.parentNode) { thinkingEl.style.transition = "none"; thinkingEl.remove(); }
+    const errEl = _makeChatMsg("assistant", "");
+    errEl.querySelector(".bubble-content").innerHTML = `<span class="error-msg">${escapeHtml("Error: " + err.message)}</span>`;
+    feed.appendChild(errEl);
     await updateActiveThread({ status: "error" });
     showToast(err.message);
+  } finally {
+    _liveThinkingEl = null;
+    resetStreamState();
+    await flushActiveThread();
+    _setStatusBadge(getState().activeThread?.status ?? "");
+    _setThreadComposeEnabled(true);
   }
-
-  await flushActiveThread();
-  if (viewThread.style.display !== "none") renderThreadView();
 }
 
 // ── Boot ───────────────────────────────────────────────────────────────────────
@@ -520,11 +672,27 @@ document.addEventListener("DOMContentLoaded", () => {
     await runAgentLoop();
   });
 
+  $("thread-input").addEventListener("input", () => {
+    $("thread-send-btn").disabled = !$("thread-input").value.trim();
+  });
+  $("thread-input").addEventListener("keydown", e => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("thread-send-btn").click(); }
+  });
+  $("thread-send-btn").addEventListener("click", async () => {
+    const text = $("thread-input").value.trim();
+    if (!text) return;
+    $("thread-input").value = "";
+    _setThreadComposeEnabled(false);
+    await appendMessage({ type: "user", content: text });
+    $("agent-feed").appendChild(_makeChatMsg("user", text));
+    await runAgentLoop(true);
+  });
+
   $("back-btn").addEventListener("click", showHome);
 
-  $("perm-deny-btn").addEventListener("click", () => { hidePermissionPrompt(); _permResolve?.("deny"); });
-  $("perm-allow-btn").addEventListener("click", () => { hidePermissionPrompt(); _permResolve?.("allow"); });
-  $("perm-always-btn").addEventListener("click", () => { hidePermissionPrompt(); _permResolve?.("always"); });
+  for (const [id, v] of [["perm-deny-btn","deny"],["perm-allow-btn","allow"],["perm-always-btn","always"]]) {
+    $(id).addEventListener("click", () => resolvePermission(v));
+  }
 
   // Close panels when clicking outside
   document.addEventListener("click", (e) => {

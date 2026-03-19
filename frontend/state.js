@@ -54,7 +54,6 @@ export async function createThread(title) {
     threadIndex:  [meta, ..._state.threadIndex],
     activeThread: thread,
   };
-  _notify();
 
   // Persist both
   await Promise.all([
@@ -72,7 +71,6 @@ export async function loadThread(id) {
   const data = await invoke("get_thread", { id });
   if (data) {
     _state = { ..._state, activeThread: data };
-    _notify();
     return data;
   }
   return null;
@@ -91,7 +89,6 @@ export async function updateActiveThread(patch) {
   );
 
   _state = { ..._state, activeThread: updated, threadIndex: index };
-  _notify();
 
   await Promise.all([
     invoke("save_thread", { id: updated.id, thread: updated }),
@@ -109,7 +106,6 @@ export async function appendMessage(msg) {
     messages: [..._state.activeThread.messages, msg],
   };
   _state = { ..._state, activeThread: updated };
-  _notify();
   // Debounce: caller decides when to flush (avoid per-delta disk writes)
 }
 
@@ -145,8 +141,9 @@ export async function savePrefs() {
 }
 
 export function addTrustedFolder(folderPath) {
-  if (_state.trustedFolders.includes(folderPath)) return;
-  setState({ trustedFolders: [..._state.trustedFolders, folderPath] });
+  const norm = folderPath.replace(/\\/g, "/");
+  if (_state.trustedFolders.includes(norm)) return;
+  setState({ trustedFolders: [..._state.trustedFolders, norm] });
   savePrefs();
 }
 

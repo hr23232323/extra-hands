@@ -66,7 +66,6 @@ export async function parseStream(reader, onDelta) {
  * @param {string}   opts.systemPrompt
  * @param {Array}    [opts.tools]          tool definitions (OpenAI format)
  * @param {function} opts.onDelta          called with each streamed text chunk
- * @param {function} [opts.onToolCall]     async (toolCall) => toolResult string — executes a tool call and returns result
  * @param {function} [opts._fetch]         injectable fetch for tests
  * @returns {{ fullText: string, toolCall: object | null }}
  */
@@ -77,7 +76,6 @@ export async function orchestrateMessage({
   systemPrompt,
   tools,
   onDelta,
-  onToolCall,
   _fetch = fetch,
 }) {
   console.log("[extra-hands] orchestrateMessage — model:", model, "| tools:", tools?.length ?? 0);
