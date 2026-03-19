@@ -50,6 +50,7 @@
 
   <!-- ── Settings panel ──────────────────────────────────────────────────── -->
   <div id="settings-bar" class="settings-panel">
+
     <div class="sp-row">
       <span class="sp-label">model</span>
       <select id="model-select"></select>
@@ -59,6 +60,29 @@
       <input type="password" id="api-key-input" placeholder="sk-or-..." autocomplete="off" spellcheck="false" />
       <button id="save-key-btn">save</button>
     </div>
+
+    <div class="sp-divider">
+      <span class="sp-divider-label">web access</span>
+    </div>
+
+    <div class="sp-group">
+      <div class="sp-row">
+        <span class="sp-label">tavily</span>
+        <input type="password" id="tavily-key-input" placeholder="tvly-..." autocomplete="off" spellcheck="false" />
+        <button id="save-tavily-btn">save</button>
+      </div>
+      <p class="sp-desc">enables <code>web_search</code> — get a free key at <span class="sp-link">tavily.com</span></p>
+    </div>
+
+    <div class="sp-group">
+      <div class="sp-row">
+        <span class="sp-label">jina</span>
+        <input type="password" id="jina-key-input" placeholder="jina_..." autocomplete="off" spellcheck="false" />
+        <button id="save-jina-btn">save</button>
+      </div>
+      <p class="sp-desc">optional — boosts <code>fetch_url</code> rate limit (500 rpm vs 20). free at <span class="sp-link">jina.ai</span></p>
+    </div>
+
   </div>
 
   <!-- ── History panel (slide-in overlay) ───────────────────────────────── -->

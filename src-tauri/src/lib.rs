@@ -22,21 +22,32 @@ struct Prefs {
     trusted_folders: Option<Vec<String>>,
 }
 
-#[tauri::command]
-fn get_api_key(app: tauri::AppHandle) -> Option<String> {
+fn get_secure_key(app: &tauri::AppHandle, store_key: &str) -> Option<String> {
     let store = app.store("store.json").ok()?;
-    store
-        .get("api_key")
-        .and_then(|v| v.as_str().map(String::from))
+    store.get(store_key).and_then(|v| v.as_str().map(String::from))
 }
 
-#[tauri::command]
-fn set_api_key(app: tauri::AppHandle, key: String) {
+fn set_secure_key(app: &tauri::AppHandle, store_key: &str, key: String) {
     if let Ok(store) = app.store("store.json") {
-        store.set("api_key", serde_json::Value::String(key));
+        store.set(store_key, serde_json::Value::String(key));
         let _ = store.save();
     }
 }
+
+#[tauri::command]
+fn get_api_key(app: tauri::AppHandle) -> Option<String> { get_secure_key(&app, "api_key") }
+#[tauri::command]
+fn set_api_key(app: tauri::AppHandle, key: String) { set_secure_key(&app, "api_key", key); }
+
+#[tauri::command]
+fn get_tavily_key(app: tauri::AppHandle) -> Option<String> { get_secure_key(&app, "tavily_key") }
+#[tauri::command]
+fn set_tavily_key(app: tauri::AppHandle, key: String) { set_secure_key(&app, "tavily_key", key); }
+
+#[tauri::command]
+fn get_jina_key(app: tauri::AppHandle) -> Option<String> { get_secure_key(&app, "jina_key") }
+#[tauri::command]
+fn set_jina_key(app: tauri::AppHandle, key: String) { set_secure_key(&app, "jina_key", key); }
 
 #[tauri::command]
 fn get_prefs(app: tauri::AppHandle) -> Prefs {
@@ -190,6 +201,10 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_api_key,
             set_api_key,
+            get_tavily_key,
+            set_tavily_key,
+            get_jina_key,
+            set_jina_key,
             get_prefs,
             set_prefs,
             get_thread_index,

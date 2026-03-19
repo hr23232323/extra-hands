@@ -10,6 +10,8 @@ const invoke = window.__TAURI__?.core?.invoke ?? (() => Promise.resolve(null));
 // ── Internal state ─────────────────────────────────────────────────────────────
 let _state = {
   apiKey:         null,
+  tavilyKey:      null,
+  jinaKey:        null,
   model:          "qwen/qwen3-32b:nitro",
   theme:          "light",
   workspace:      null,
@@ -119,14 +121,18 @@ export async function flushActiveThread() {
 // ── Persistence ────────────────────────────────────────────────────────────────
 
 export async function loadState() {
-  const [apiKey, prefs, threadIndex] = await Promise.all([
+  const [apiKey, tavilyKey, jinaKey, prefs, threadIndex] = await Promise.all([
     invoke("get_api_key"),
+    invoke("get_tavily_key"),
+    invoke("get_jina_key"),
     invoke("get_prefs"),
     invoke("get_thread_index"),
   ]);
 
   const patch = {};
   if (apiKey)           patch.apiKey      = apiKey;
+  if (tavilyKey)        patch.tavilyKey   = tavilyKey;
+  if (jinaKey)          patch.jinaKey     = jinaKey;
   if (prefs?.model)     patch.model       = prefs.model;
   if (prefs?.theme)     patch.theme       = prefs.theme;
   if (prefs?.workspace) patch.workspace   = prefs.workspace;
@@ -151,4 +157,14 @@ export function addTrustedFolder(folderPath) {
 export async function saveApiKey(key) {
   await invoke("set_api_key", { key });
   setState({ apiKey: key });
+}
+
+export async function saveTavilyKey(key) {
+  await invoke("set_tavily_key", { key });
+  setState({ tavilyKey: key });
+}
+
+export async function saveJinaKey(key) {
+  await invoke("set_jina_key", { key });
+  setState({ jinaKey: key });
 }

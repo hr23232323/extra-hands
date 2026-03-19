@@ -1,7 +1,7 @@
 // ── app.js — extra-hands UI controller ────────────────────────────────────────
 import {
   getState, setState,
-  loadState, savePrefs, saveApiKey,
+  loadState, savePrefs, saveApiKey, saveTavilyKey, saveJinaKey,
   createThread, loadThread, updateActiveThread,
   appendMessage, flushActiveThread,
   addTrustedFolder,
@@ -249,8 +249,10 @@ async function toggleTheme() {
 function showSettings() {
   $("settings-bar").classList.add("open");
   $("settings-btn").classList.add("active");
-  const { apiKey } = getState();
-  if (apiKey) $("api-key-input").value = apiKey;
+  const { apiKey, tavilyKey, jinaKey } = getState();
+  if (apiKey)    $("api-key-input").value    = apiKey;
+  if (tavilyKey) $("tavily-key-input").value = tavilyKey;
+  if (jinaKey)   $("jina-key-input").value   = jinaKey;
 }
 
 function hideSettings() {
@@ -435,6 +437,31 @@ function renderThreadView() {
 }
 
 // ── Agent loop ─────────────────────────────────────────────────────────────────
+// ── Web tool implementations ────────────────────────────────────────────────────
+
+async function tavilySearch(query, key) {
+  const res = await fetch("https://api.tavily.com/search", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ api_key: key, query, search_depth: "basic", max_results: 6, include_answer: false }),
+  });
+  if (!res.ok) throw new Error(`Tavily ${res.status}: ${await res.text()}`);
+  const data = await res.json();
+  return data.results.map(r => ({ title: r.title, url: r.url, snippet: r.content, score: r.score }));
+}
+
+async function jinaFetch(url, key) {
+  const headers = { "Accept": "text/plain", "X-Return-Format": "markdown" };
+  if (key) headers["Authorization"] = `Bearer ${key}`;
+  const res = await fetch(`https://r.jina.ai/${encodeURIComponent(url)}`, { headers });
+  if (!res.ok) throw new Error(`Jina ${res.status}`);
+  // Truncate very large pages to avoid blowing the context window
+  const text = await res.text();
+  return text.length > 12000 ? text.slice(0, 12000) + "\n\n[truncated]" : text;
+}
+
+// ── Tool definitions ────────────────────────────────────────────────────────────
+
 let _liveThinkingEl = null;
 let _liveTools = [];
 const FILE_TOOLS = [
@@ -468,31 +495,82 @@ const FILE_TOOLS = [
   },
 ];
 
+const WEB_TOOLS = [
+  {
+    type: "function",
+    function: {
+      name: "web_search",
+      description: "Search the web for current information. Returns ranked URLs with snippets. Call this multiple times with different queries to research a topic thoroughly.",
+      parameters: {
+        type: "object",
+        properties: { query: { type: "string", description: "The search query" } },
+        required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "fetch_url",
+      description: "Fetch a web page and return its full content as markdown. Use after web_search to read the complete content of promising URLs.",
+      parameters: {
+        type: "object",
+        properties: { url: { type: "string", description: "The full URL to fetch" } },
+        required: ["url"],
+      },
+    },
+  },
+];
+
+function _logToolStep(toolName, toolArg) {
+  const { activeThread } = getState();
+  if (!activeThread) return;
+  appendMessage({ type: "tool", toolName, toolArg });
+  if (_liveThinkingEl) {
+    addThinkingStep(_liveThinkingEl, toolName, toolArg);
+    _liveTools.push({ toolName, toolArg });
+    $("agent-feed").scrollTop = $("agent-feed").scrollHeight;
+  }
+}
+
 async function executeTool(toolName, argsStr) {
   let args;
   try { args = JSON.parse(argsStr); } catch { return "Error: could not parse tool args."; }
 
+  // ── Web tools ──────────────────────────────────────────────────────────────
+  if (toolName === "web_search") {
+    const { tavilyKey } = getState();
+    if (!tavilyKey) return "Error: Tavily API key not set. Add it in Settings to enable web search.";
+    _logToolStep("web_search", args.query ?? "");
+    try {
+      return JSON.stringify(await tavilySearch(args.query, tavilyKey));
+    } catch (err) {
+      return `Error: ${err.message ?? err}`;
+    }
+  }
+
+  if (toolName === "fetch_url") {
+    const { jinaKey } = getState();
+    _logToolStep("fetch_url", args.url ?? "");
+    try {
+      return await jinaFetch(args.url, jinaKey);
+    } catch (err) {
+      return `Error: ${err.message ?? err}`;
+    }
+  }
+
+  // ── File tools ─────────────────────────────────────────────────────────────
   const { workspace } = getState();
   if (!workspace) return "Error: no workspace selected.";
   const path = boxPath(workspace, args.path ?? "");
 
   const decision = await checkPermission(toolName, path);
-
   if (decision === "deny") return "Error: access denied by user.";
-
   if (decision === "always") {
     addTrustedFolder(toolName === "list_dir" ? normPath(path) : _parentDir(path));
   }
 
-  const { activeThread } = getState();
-  if (activeThread) {
-    await appendMessage({ type: "tool", toolName, toolArg: path });
-    if (_liveThinkingEl) {
-      addThinkingStep(_liveThinkingEl, toolName, path);
-      _liveTools.push({ toolName, toolArg: path });
-      $("agent-feed").scrollTop = $("agent-feed").scrollHeight;
-    }
-  }
+  _logToolStep(toolName, path);
 
   try {
     if (toolName === "list_dir")   return JSON.stringify(await listDir(path));
@@ -545,9 +623,23 @@ async function runAgentLoop(isContinuation = false) {
   _liveTools = [];
   feed.scrollTop = feed.scrollHeight;
 
-  const systemPrompt = `You are extra-hands, an autonomous file-based task agent running inside the user's workspace.
-Use relative paths for all file operations (e.g. "report.txt", "subdir/data.csv"). The system will resolve them to the correct location automatically.
-You can call list_dir, read_file, and write_file to complete the task.
+  const { tavilyKey } = getState();
+  const hasWeb = !!tavilyKey;
+  const tools = hasWeb ? [...FILE_TOOLS, ...WEB_TOOLS] : FILE_TOOLS;
+
+  const systemPrompt = `You are extra-hands, an autonomous agent running inside the user's workspace.
+
+File tools (always available):
+- list_dir(path): list files in a directory. Use relative paths — e.g. "." or "subdir/".
+- read_file(path): read a file's contents.
+- write_file(path, content): write or overwrite a file.
+All paths are relative and resolved into the workspace automatically.
+${hasWeb ? `
+Web tools (available):
+- web_search(query): search the web. Returns ranked URLs + snippets. Call multiple times with different queries to research thoroughly.
+- fetch_url(url): fetch a full web page as markdown. Use after web_search to read promising pages in full.
+For research tasks, do NOT stop at one search. Run 5–10 targeted searches, fetch the most relevant pages, synthesize the findings, then write the output file.
+` : ""}
 Work autonomously. When done, summarize what you did and what files were created or modified.`;
 
   const messages = _buildMessages(activeThread);
@@ -588,10 +680,10 @@ Work autonomously. When done, summarize what you did and what files were created
   }
 
   try {
-    for (let turn = 0; turn < 8; turn++) {
+    for (let turn = 0; turn < 25; turn++) {
       const result = await orchestrateMessage({
         apiKey, model, messages, systemPrompt,
-        tools: FILE_TOOLS,
+        tools,
         onDelta,
       });
 
@@ -678,6 +770,22 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   $("save-key-btn").addEventListener("click", saveKeyAndHide);
   $("api-key-input").addEventListener("keydown", e => { if (e.key === "Enter") saveKeyAndHide(); });
+
+  $("save-tavily-btn").addEventListener("click", async () => {
+    const key = $("tavily-key-input").value.trim();
+    if (key) { await saveTavilyKey(key); showToast("Tavily key saved — web search enabled"); }
+  });
+  $("tavily-key-input").addEventListener("keydown", async e => {
+    if (e.key === "Enter") { const key = e.target.value.trim(); if (key) { await saveTavilyKey(key); showToast("Tavily key saved"); } }
+  });
+
+  $("save-jina-btn").addEventListener("click", async () => {
+    const key = $("jina-key-input").value.trim();
+    if (key) { await saveJinaKey(key); showToast("Jina key saved — fetch_url rate limit increased"); }
+  });
+  $("jina-key-input").addEventListener("keydown", async e => {
+    if (e.key === "Enter") { const key = e.target.value.trim(); if (key) { await saveJinaKey(key); showToast("Jina key saved"); } }
+  });
 
   $("pick-folder-btn").addEventListener("click", handlePickFolder);
   $("task-input").addEventListener("input", updateRunButton);

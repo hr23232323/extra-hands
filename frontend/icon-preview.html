@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>extra-hands — brand</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #faf8f5;
+      --surface:  #f2f0ec;
+      --border:   #e4e0da;
+      --text:     #1c1a18;
+      --muted:    #7a746d;
+      --faint:    #b8b2ab;
+      --accent:   #8b5e3c;
+      --accent-l: #f5ede5;
+      --display:  'Playfair Display', Georgia, serif;
+      --mono:     'JetBrains Mono', monospace;
+      --sans:     -apple-system, 'Segoe UI', sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 64px 48px 96px;
+      max-width: 720px;
+    }
+
+    /* ── Header ── */
+    .brand-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 56px;
+      padding-bottom: 32px;
+      border-bottom: 1px solid var(--border);
+    }
+    .brand-wordmark {
+      font-family: var(--display);
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: -0.01em;
+    }
+    .brand-wordmark .hyphen { color: var(--accent); }
+    .brand-tag {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--faint);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-left: auto;
+    }
+
+    /* ── Section ── */
+    section { margin-bottom: 56px; }
+    h2 {
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 400;
+      color: var(--faint);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 24px;
+    }
+
+    /* ── Rationale ── */
+    .rationale p {
+      font-size: 15px;
+      line-height: 1.8;
+      color: var(--text);
+      max-width: 560px;
+      margin-bottom: 16px;
+    }
+    .rationale p:last-child { margin-bottom: 0; }
+    .rationale em {
+      font-family: var(--display);
+      font-style: italic;
+      color: var(--accent);
+    }
+
+    /* ── Icon grid ── */
+    .icon-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .icon-cell {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .icon-stage {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      position: relative;
+    }
+    .icon-stage.on-light {
+      background: #e8e5e0;
+      width: 100%;
+      aspect-ratio: 1;
+    }
+    .icon-stage.on-dark {
+      background: #1c1a17;
+      width: 100%;
+      aspect-ratio: 1;
+    }
+
+    .icon-label {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--faint);
+      text-align: center;
+    }
+    .icon-label strong {
+      display: block;
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 400;
+      margin-bottom: 2px;
+    }
+
+    /* ── The SVG icon — defined as a reusable element ── */
+    /* Three rounded-rect fingers, bottom-aligned, varying heights */
+
+    /* ── Wordmark showcase ── */
+    .wordmark-row {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+    .wm-cell {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 20px 24px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+    }
+    .wm-cell.dark {
+      background: #1c1a17;
+      border-color: #2e2c28;
+    }
+    .wm-text {
+      font-family: var(--display);
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: -0.01em;
+    }
+    .wm-cell.dark .wm-text { color: #e8e4dd; }
+    .wm-text .h { color: var(--accent); }
+    .wm-cell.dark .wm-text .h { color: #c4845a; }
+
+    /* ── Color palette ── */
+    .palette-grid {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .swatch {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .swatch-color {
+      width: 72px;
+      height: 48px;
+      border-radius: 6px;
+      border: 1px solid rgba(0,0,0,0.06);
+    }
+    .swatch-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--faint);
+      line-height: 1.4;
+    }
+    .swatch-label strong {
+      display: block;
+      color: var(--muted);
+      font-weight: 400;
+    }
+
+    /* ── Export note ── */
+    .export-note {
+      padding: 16px 20px;
+      background: var(--accent-l);
+      border-radius: 6px;
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--accent);
+      line-height: 1.6;
+    }
+
+    hr.divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 48px 0;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="brand-header">
+    <!-- The mark -->
+    <svg width="18" height="20" viewBox="0 0 18 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <rect x="0.5"  y="10" width="4" height="10" rx="2" fill="#8b5e3c"/>
+      <rect x="7"    y="4"  width="4" height="16" rx="2" fill="#8b5e3c"/>
+      <rect x="13.5" y="7"  width="4" height="13" rx="2" fill="#8b5e3c"/>
+    </svg>
+    <span class="brand-wordmark">extra<span class="hyphen">-</span>hands</span>
+    <span class="brand-tag">brand reference · v0.1</span>
+  </div>
+
+  <!-- ── Rationale ── -->
+  <section class="rationale">
+    <h2>Direction</h2>
+    <p>
+      The extra-hands identity is built around <em>quiet competence</em>. This is a tool that gets things done without ceremony — calm, warm, and reliably present. The aesthetic sits between a craftsperson's workshop and a well-worn desk: analog warmth expressed through clean geometry.
+    </p>
+    <p>
+      The mark is three parallel rounded fingers — a minimal abstraction of an open, helping hand. Not a robot arm, not a sparkle, not an arrow. A hand. Human, direct, unpretentious. The middle finger stands tallest, left and right frame it; together they suggest reach, readiness, and the act of handling work on someone's behalf.
+    </p>
+    <p>
+      The warm brown accent carries through from mark to wordmark hyphen, tying the identity together without needing a brand color splashed everywhere. The typography (Playfair Display) gives the wordmark editorial weight — this is a considered tool, not a startup commodity.
+    </p>
+  </section>
+
+  <hr class="divider">
+
+  <!-- ── Tray icon previews ── -->
+  <section>
+    <h2>Tray icon — menu bar sizes</h2>
+    <div class="icon-grid">
+
+      <!-- 16px light -->
+      <div class="icon-cell">
+        <div class="icon-stage on-light">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="0.5"  y="7"  width="3.5" height="8.5" rx="1.75" fill="black"/>
+            <rect x="6.25" y="3"  width="3.5" height="12.5" rx="1.75" fill="black"/>
+            <rect x="12"   y="5"  width="3.5" height="10.5" rx="1.75" fill="black"/>
+          </svg>
+        </div>
+        <div class="icon-label"><strong>16 × 16</strong>light menu bar</div>
+      </div>
+
+      <!-- 22px light -->
+      <div class="icon-cell">
+        <div class="icon-stage on-light">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="1"    y="9.5"  width="4.5" height="11.5" rx="2.25" fill="black"/>
+            <rect x="8.75" y="4"    width="4.5" height="17"   rx="2.25" fill="black"/>
+            <rect x="16.5" y="7"    width="4.5" height="14"   rx="2.25" fill="black"/>
+          </svg>
+        </div>
+        <div class="icon-label"><strong>22 × 22</strong>retina menu bar</div>
+      </div>
+
+      <!-- 32px light -->
+      <div class="icon-cell">
+        <div class="icon-stage on-light">
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="1.5"  y="14" width="6.5" height="16.5" rx="3.25" fill="black"/>
+            <rect x="12.75" y="6"  width="6.5" height="24.5" rx="3.25" fill="black"/>
+            <rect x="24"   y="10" width="6.5" height="20.5" rx="3.25" fill="black"/>
+          </svg>
+        </div>
+        <div class="icon-label"><strong>32 × 32</strong>standard</div>
+      </div>
+
+      <!-- 16px dark -->
+      <div class="icon-cell">
+        <div class="icon-stage on-dark">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="0.5"  y="7"  width="3.5" height="8.5" rx="1.75" fill="white"/>
+            <rect x="6.25" y="3"  width="3.5" height="12.5" rx="1.75" fill="white"/>
+            <rect x="12"   y="5"  width="3.5" height="10.5" rx="1.75" fill="white"/>
+          </svg>
+        </div>
+        <div class="icon-label"><strong>16 × 16</strong>dark menu bar</div>
+      </div>
+
+      <!-- 22px dark -->
+      <div class="icon-cell">
+        <div class="icon-stage on-dark">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="1"    y="9.5"  width="4.5" height="11.5" rx="2.25" fill="white"/>
+            <rect x="8.75" y="4"    width="4.5" height="17"   rx="2.25" fill="white"/>
+            <rect x="16.5" y="7"    width="4.5" height="14"   rx="2.25" fill="white"/>
+          </svg>
+        </div>
+        <div class="icon-label"><strong>22 × 22</strong>dark retina</div>
+      </div>
+
+      <!-- 32px dark -->
+      <div class="icon-cell">
+        <div class="icon-stage on-dark">
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="1.5"   y="14" width="6.5" height="16.5" rx="3.25" fill="white"/>
+            <rect x="12.75" y="6"  width="6.5" height="24.5" rx="3.25" fill="white"/>
+            <rect x="24"    y="10" width="6.5" height="20.5" rx="3.25" fill="white"/>
+          </svg>
+        </div>
+        <div class="icon-label"><strong>32 × 32</strong>dark standard</div>
+      </div>
+
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- ── Wordmark ── -->
+  <section>
+    <h2>Wordmark + logomark</h2>
+    <div class="wordmark-row">
+      <div class="wm-cell">
+        <svg width="16" height="18" viewBox="0 0 18 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="0.5"  y="10" width="4" height="10" rx="2" fill="#8b5e3c"/>
+          <rect x="7"    y="4"  width="4" height="16" rx="2" fill="#8b5e3c"/>
+          <rect x="13.5" y="7"  width="4" height="13" rx="2" fill="#8b5e3c"/>
+        </svg>
+        <span class="wm-text">extra<span class="h">-</span>hands</span>
+      </div>
+      <div class="wm-cell dark">
+        <svg width="16" height="18" viewBox="0 0 18 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="0.5"  y="10" width="4" height="10" rx="2" fill="#c4845a"/>
+          <rect x="7"    y="4"  width="4" height="16" rx="2" fill="#c4845a"/>
+          <rect x="13.5" y="7"  width="4" height="13" rx="2" fill="#c4845a"/>
+        </svg>
+        <span class="wm-text">extra<span class="h">-</span>hands</span>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- ── Color palette ── -->
+  <section>
+    <h2>Palette</h2>
+    <div class="palette-grid">
+      <div class="swatch">
+        <div class="swatch-color" style="background:#faf8f5; border-color:#d8d4ce;"></div>
+        <div class="swatch-label"><strong>bg</strong>#faf8f5</div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-color" style="background:#f2f0ec;"></div>
+        <div class="swatch-label"><strong>surface</strong>#f2f0ec</div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-color" style="background:#8b5e3c;"></div>
+        <div class="swatch-label"><strong>accent</strong>#8b5e3c</div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-color" style="background:#6e4a2e;"></div>
+        <div class="swatch-label"><strong>accent-dark</strong>#6e4a2e</div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-color" style="background:#1a1916;"></div>
+        <div class="swatch-label"><strong>bg-dark</strong>#1a1916</div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-color" style="background:#c4845a;"></div>
+        <div class="swatch-label"><strong>accent-d</strong>#c4845a</div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- ── SVG source ── -->
+  <section>
+    <h2>Tray icon SVG source (16 × 16, monochrome)</h2>
+    <div class="export-note">
+      &lt;svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"&gt;<br>
+      &nbsp;&nbsp;&lt;rect x="0.5"  y="7"  width="3.5" height="8.5"  rx="1.75" fill="currentColor"/&gt;<br>
+      &nbsp;&nbsp;&lt;rect x="6.25" y="3"  width="3.5" height="12.5" rx="1.75" fill="currentColor"/&gt;<br>
+      &nbsp;&nbsp;&lt;rect x="12"   y="5"  width="3.5" height="10.5" rx="1.75" fill="currentColor"/&gt;<br>
+      &lt;/svg&gt;<br><br>
+      To convert to PNG for Tauri: save as tray-icon.svg, then run<br>
+      <strong>rsvg-convert -w 32 -h 32 tray-icon.svg &gt; src-tauri/icons/tray-icon.png</strong><br>
+      or use any SVG→PNG tool at 32×32 with black fill on transparent background.
+    </div>
+  </section>
+
+</body>
+</html>

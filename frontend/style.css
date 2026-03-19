@@ -216,6 +216,49 @@ header {
 }
 .sp-row button:hover { background: var(--accent-dark); }
 
+.sp-divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0;
+}
+.sp-divider::before,
+.sp-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+.sp-divider-label {
+  font-size: 9px;
+  font-family: var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+.sp-group { display: flex; flex-direction: column; gap: 4px; }
+
+.sp-desc {
+  font-size: 10.5px;
+  font-family: var(--mono);
+  color: var(--text-faint);
+  padding-left: 62px;
+  line-height: 1.5;
+}
+.sp-desc code {
+  color: var(--accent);
+  font-size: 10px;
+  background: var(--accent-bg);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+.sp-link {
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+
 /* ── History panel ──────────────────────────────────────────────────────── */
 .history-backdrop {
   position: fixed;
