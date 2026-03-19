@@ -19,13 +19,14 @@ jobs:
       - name: cargo check
         run: cargo check --manifest-path src-tauri/Cargo.toml
 
-  js-test:
-    name: JS tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - name: Run tests
-        run: node --test tests/search.test.mjs
+  # js-test job placeholder — add tests/search.test.mjs to enable
+  # js-test:
+  #   name: JS tests
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-node@v4
+  #       with:
+  #         node-version: 20
+  #     - name: Run tests
+  #       run: node --test tests/search.test.mjs
