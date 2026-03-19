@@ -1,0 +1,143 @@
+<svg width="1280" height="640" viewBox="0 0 1280 640" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      @keyframes b1 { 0%,100%{opacity:.75} 50%{opacity:1} }
+      @keyframes b2 { 0%,100%{opacity:1}   50%{opacity:.6} }
+      @keyframes b3 { 0%,100%{opacity:.8}  50%{opacity:1} }
+      .lb1 { animation: b1 2.8s ease-in-out infinite; }
+      .lb2 { animation: b2 2.2s ease-in-out infinite .5s; }
+      .lb3 { animation: b3 2.5s ease-in-out infinite 1s; }
+    </style>
+
+    <!-- warm glow upper-left -->
+    <radialGradient id="warmth" gradientUnits="userSpaceOnUse" cx="320" cy="280" r="560">
+      <stop offset="0%"   stop-color="#3a2517" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="#3a2517" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- logo mark glow -->
+    <radialGradient id="logoGlow" gradientUnits="userSpaceOnUse" cx="1072" cy="295" r="240">
+      <stop offset="0%"   stop-color="#c4845a" stop-opacity="0.22"/>
+      <stop offset="55%"  stop-color="#c4845a" stop-opacity="0.06"/>
+      <stop offset="100%" stop-color="#c4845a" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- fade the right edge -->
+    <linearGradient id="rightFade" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%"   stop-color="#1a1916" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#1a1916" stop-opacity="0.45"/>
+    </linearGradient>
+  </defs>
+
+  <!-- ── background ── -->
+  <rect width="1280" height="640" fill="#1a1916"/>
+  <rect width="1280" height="640" fill="url(#warmth)"/>
+
+  <!-- scan-line texture -->
+  <g opacity="1">
+    <rect x="0" y="40"  width="1280" height="1" fill="#fff" opacity="0.016"/>
+    <rect x="0" y="80"  width="1280" height="1" fill="#fff" opacity="0.016"/>
+    <rect x="0" y="120" width="1280" height="1" fill="#fff" opacity="0.016"/>
+    <rect x="0" y="160" width="1280" height="1" fill="#fff" opacity="0.016"/>
+    <rect x="0" y="200" width="1280" height="1" fill="#fff" opacity="0.016"/>
+    <rect x="0" y="240" width="1280" height="1" fill="#fff" opacity="0.016"/>
+    <rect x="0" y="280" width="1280" height="1" fill="#fff" opacity="0.016"/>
+    <rect x="0" y="320" width="1280" height="1" fill="#fff" opacity="0.016"/>
+    <rect x="0" y="360" width="1280" height="1" fill="#fff" opacity="0.016"/>
+    <rect x="0" y="400" width="1280" height="1" fill="#fff" opacity="0.016"/>
+    <rect x="0" y="440" width="1280" height="1" fill="#fff" opacity="0.016"/>
+    <rect x="0" y="480" width="1280" height="1" fill="#fff" opacity="0.016"/>
+    <rect x="0" y="520" width="1280" height="1" fill="#fff" opacity="0.016"/>
+    <rect x="0" y="560" width="1280" height="1" fill="#fff" opacity="0.016"/>
+    <rect x="0" y="600" width="1280" height="1" fill="#fff" opacity="0.016"/>
+  </g>
+
+  <!-- ── frame ── -->
+  <line x1="0"   y1="52"  x2="1280" y2="52"  stroke="#2e2c29" stroke-width="1"/>
+  <line x1="0"   y1="598" x2="1280" y2="598" stroke="#2e2c29" stroke-width="1"/>
+  <line x1="870" y1="52"  x2="870"  y2="598" stroke="#2e2c29" stroke-width="1"/>
+
+  <!-- accent tick on vertical divider -->
+  <line x1="870" y1="52" x2="870" y2="130" stroke="#c4845a" stroke-width="1" opacity="0.5"/>
+  <line x1="870" y1="520" x2="870" y2="598" stroke="#c4845a" stroke-width="1" opacity="0.5"/>
+
+  <!-- ── meta labels ── -->
+  <text x="64" y="37"
+        font-family="'Courier New', Courier, monospace"
+        font-size="10" letter-spacing="0.22em"
+        fill="#46433e">MENU BAR AI AGENT</text>
+
+  <text x="856" y="37" text-anchor="end"
+        font-family="'Courier New', Courier, monospace"
+        font-size="10" letter-spacing="0.12em"
+        fill="#46433e">v 0.1 — alpha</text>
+
+  <!-- ── main type ── -->
+
+  <!-- "extra-" -->
+  <text x="64" y="234"
+        font-family="Georgia, 'Times New Roman', serif"
+        font-size="124" font-style="italic" font-weight="400"
+        fill="#e8e4dd" letter-spacing="-0.025em">extra<tspan fill="#c4845a">-</tspan></text>
+
+  <!-- "hands" — indented, creates editorial tension -->
+  <text x="172" y="388"
+        font-family="Georgia, 'Times New Roman', serif"
+        font-size="124" font-style="italic" font-weight="400"
+        fill="#e8e4dd" letter-spacing="-0.025em">hands</text>
+
+  <!-- double rule: one dark, one accent -->
+  <line x1="64"  y1="418" x2="420" y2="418" stroke="#2e2c29"  stroke-width="1"/>
+  <line x1="64"  y1="420" x2="220" y2="420" stroke="#c4845a"  stroke-width="1" opacity="0.55"/>
+
+  <!-- tagline -->
+  <text x="64" y="454"
+        font-family="Georgia, 'Times New Roman', serif"
+        font-size="26" font-style="italic"
+        fill="#a8a39b" letter-spacing="-0.01em">put me to work.</text>
+
+  <!-- sub-tagline -->
+  <text x="64" y="500"
+        font-family="'Courier New', Courier, monospace"
+        font-size="11.5" letter-spacing="0.13em"
+        fill="#6b6660">point me at a folder · describe a task · step away</text>
+
+  <!-- platform / licence strip -->
+  <text x="64" y="572"
+        font-family="'Courier New', Courier, monospace"
+        font-size="10.5" letter-spacing="0.2em"
+        fill="#3e3b36">macOS   ·   OPEN SOURCE   ·   BYOK   ·   MIT</text>
+
+  <!-- ── right panel — logo mark ── -->
+
+  <!-- glow halo -->
+  <ellipse cx="1072" cy="295" rx="240" ry="220" fill="url(#logoGlow)"/>
+
+  <!-- logo mark: original viewBox 0 0 18 20, scaled ×9.2 → 165.6 × 184px -->
+  <!-- center at cx=1072 cy=295 → origin x=1072-82.8=989.2  y=295-92=203 -->
+  <!-- bar1: orig x=0.5 y=10 w=4 h=10 rx=2  → x=989.2+4.6=993.8  y=203+92=295   w=36.8 h=92   rx=18.4 -->
+  <!-- bar2: orig x=7   y=4  w=4 h=16 rx=2  → x=989.2+64.4=1053.6 y=203+36.8=240 w=36.8 h=147.2 rx=18.4 -->
+  <!-- bar3: orig x=13.5 y=7 w=4 h=13 rx=2  → x=989.2+124.2=1113  y=203+64.4=267  w=36.8 h=119.6 rx=18.4 -->
+  <!-- all bars bottom-align at y=295+92=387 ✓ -->
+
+  <g fill="#c4845a">
+    <rect class="lb1" x="993.8"  y="295"   width="36.8" height="92"    rx="18.4"/>
+    <rect class="lb2" x="1053.6" y="239.8"  width="36.8" height="147.2" rx="18.4"/>
+    <rect class="lb3" x="1113.4" y="267.4"  width="36.8" height="119.6" rx="18.4"/>
+  </g>
+
+  <!-- label beneath logo -->
+  <text x="1072" y="438" text-anchor="middle"
+        font-family="Georgia, 'Times New Roman', serif"
+        font-size="15" font-style="italic"
+        fill="#6b6660" letter-spacing="0.06em">extra-hands</text>
+
+  <!-- github hint -->
+  <text x="1072" y="465" text-anchor="middle"
+        font-family="'Courier New', Courier, monospace"
+        font-size="10" letter-spacing="0.1em"
+        fill="#3e3b36">github.com/hr23232323/extra-hands</text>
+
+  <!-- right-edge fade -->
+  <rect x="870" y="52" width="410" height="546" fill="url(#rightFade)"/>
+</svg>
