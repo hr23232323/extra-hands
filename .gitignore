@@ -1,1 +1,23 @@
+# Claude
 .claude/settings.local.json
+
+# Tauri / Rust
+target/
+src-tauri/target/
+*.dmg
+*.app
+gen/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
