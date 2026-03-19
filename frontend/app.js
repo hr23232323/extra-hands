@@ -36,7 +36,7 @@ function showHome() {
   setState({ activeThread: null });
   $("history-btn").classList.remove("active");
   viewHome.classList.remove("entering");
-  void viewHome.offsetWidth; // retrigger animation
+  viewHome.getAnimations({ subtree: true }).forEach(a => a.cancel());
   viewHome.classList.add("entering");
 }
 
@@ -259,15 +259,16 @@ function renderThreadView() {
   }
 }
 
+const _TOOL_ICONS = {
+  read_file:  `<svg class="tool-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="1" width="10" height="13" rx="1"/><line x1="5" y1="5" x2="9" y2="5"/><line x1="5" y1="8" x2="9" y2="8"/></svg>`,
+  write_file: `<svg class="tool-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6z"/><polyline points="10 2 10 6 14 6"/></svg>`,
+  list_dir:   `<svg class="tool-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 4h4l2 2h8v8H1z"/></svg>`,
+};
+
 function _makeToolChip({ toolName, toolArg }) {
-  const icons = {
-    read_file:  `<svg class="tool-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="1" width="10" height="13" rx="1"/><line x1="5" y1="5" x2="9" y2="5"/><line x1="5" y1="8" x2="9" y2="8"/></svg>`,
-    write_file: `<svg class="tool-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6z"/><polyline points="10 2 10 6 14 6"/></svg>`,
-    list_dir:   `<svg class="tool-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 4h4l2 2h8v8H1z"/></svg>`,
-  };
   const chip = document.createElement("div");
   chip.className = "tool-chip";
-  chip.innerHTML = (icons[toolName] ?? "") +
+  chip.innerHTML = (_TOOL_ICONS[toolName] ?? "") +
     `<span class="tool-name">${toolName}</span>` +
     (toolArg ? `<span class="tool-arg">${toolArg}</span>` : "");
   return chip;
@@ -453,7 +454,9 @@ document.addEventListener("DOMContentLoaded", () => {
   $("pick-folder-btn").addEventListener("click", handlePickFolder);
   $("task-input").addEventListener("input", updateRunButton);
 
+  const _arrowSvg = `<svg class="task-card-arrow" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 10L10 2M10 2H5M10 2v5"/></svg>`;
   document.querySelectorAll(".task-card").forEach(card => {
+    card.insertAdjacentHTML("beforeend", _arrowSvg);
     card.addEventListener("click", () => {
       $("task-input").value = card.dataset.task;
       $("task-input").focus();
