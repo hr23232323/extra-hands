@@ -348,6 +348,8 @@ header {
   min-height: 0;
 }
 
+#view-home { overflow: hidden; }
+
 /* ── Home hero ──────────────────────────────────────────────────────────── */
 .home-hero {
   flex: 1;
@@ -444,7 +446,7 @@ header {
 #view-home.entering .home-sub,
 #view-home.entering .task-card,
 #view-home.entering .compose-area {
-  animation: homeIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) var(--delay, 0s) both;
+  animation: homeIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) var(--delay, 0s) backwards;
 }
 #view-home.entering .home-sub           { --delay: 0.07s; }
 #view-home.entering .task-card:nth-child(1) { --delay: 0.12s; }
