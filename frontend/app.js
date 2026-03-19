@@ -35,6 +35,9 @@ function showHome() {
   viewThread.style.display = "none";
   setState({ activeThread: null });
   $("history-btn").classList.remove("active");
+  viewHome.classList.remove("entering");
+  void viewHome.offsetWidth; // retrigger animation
+  viewHome.classList.add("entering");
 }
 
 function showThread() {
@@ -426,6 +429,7 @@ async function init() {
   });
 
   renderWorkspace();
+  showHome();
 }
 
 // ── Wire events ────────────────────────────────────────────────────────────────
@@ -449,9 +453,9 @@ document.addEventListener("DOMContentLoaded", () => {
   $("pick-folder-btn").addEventListener("click", handlePickFolder);
   $("task-input").addEventListener("input", updateRunButton);
 
-  document.querySelectorAll(".example-chip").forEach(chip => {
-    chip.addEventListener("click", () => {
-      $("task-input").value = chip.dataset.task;
+  document.querySelectorAll(".task-card").forEach(card => {
+    card.addEventListener("click", () => {
+      $("task-input").value = card.dataset.task;
       $("task-input").focus();
       updateRunButton();
     });

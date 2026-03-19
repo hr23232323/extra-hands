@@ -82,14 +82,39 @@
   <!-- ── Home view ───────────────────────────────────────────────────────── -->
   <div id="view-home" class="view">
 
-    <div class="compose-area">
-      <div class="compose-examples">
-        <span class="example-label">try:</span>
-        <button class="example-chip" data-task="Scrape product prices from a website and save them as a CSV">scrape → CSV</button>
-        <button class="example-chip" data-task="Write a Python script to convert all CSVs in my folder to PDF">CSV → PDF script</button>
-        <button class="example-chip" data-task="Research and write a briefing doc on [topic], pulling in sources from the web">research doc</button>
-      </div>
+    <!-- Hero -->
+    <div class="home-hero">
+      <p class="home-tagline">put me to work.</p>
+      <p class="home-sub">point me at a folder · describe a task · step away</p>
+    </div>
 
+    <!-- Task cards -->
+    <div class="home-cards">
+      <button class="task-card" data-task="Scrape product prices from a website and save them as a CSV">
+        <span class="task-card-label">extract</span>
+        <span class="task-card-title">Scrape data to CSV</span>
+        <svg class="task-card-arrow" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M2 10L10 2M10 2H5M10 2v5"/>
+        </svg>
+      </button>
+      <button class="task-card" data-task="Write a Python script to convert all CSVs in my folder to PDF">
+        <span class="task-card-label">transform</span>
+        <span class="task-card-title">Convert files in a folder</span>
+        <svg class="task-card-arrow" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M2 10L10 2M10 2H5M10 2v5"/>
+        </svg>
+      </button>
+      <button class="task-card" data-task="Research and write a briefing doc on [topic], pulling in sources from the web">
+        <span class="task-card-label">research</span>
+        <span class="task-card-title">Write a briefing doc</span>
+        <svg class="task-card-arrow" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M2 10L10 2M10 2H5M10 2v5"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Compose -->
+    <div class="compose-area">
       <div class="compose-input-wrap">
         <textarea id="task-input" class="task-textarea" placeholder="Describe a task…" rows="4" spellcheck="true"></textarea>
         <button id="run-btn" class="send-btn" disabled aria-label="Run task">
