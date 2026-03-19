@@ -29,7 +29,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src https://openrouter.ai https://fonts.googleapis.com https://fonts.gstatic.com; img-src 'self' data:"
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src https://openrouter.ai https://api.tavily.com https://r.jina.ai https://fonts.googleapis.com https://fonts.gstatic.com; img-src 'self' data:"
     }
   },
   "bundle": {

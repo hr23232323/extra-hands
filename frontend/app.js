@@ -453,7 +453,7 @@ async function tavilySearch(query, key) {
 async function jinaFetch(url, key) {
   const headers = { "Accept": "text/plain", "X-Return-Format": "markdown" };
   if (key) headers["Authorization"] = `Bearer ${key}`;
-  const res = await fetch(`https://r.jina.ai/${encodeURIComponent(url)}`, { headers });
+  const res = await fetch(`https://r.jina.ai/${url}`, { headers });
   if (!res.ok) throw new Error(`Jina ${res.status}`);
   // Truncate very large pages to avoid blowing the context window
   const text = await res.text();
@@ -636,9 +636,14 @@ File tools (always available):
 All paths are relative and resolved into the workspace automatically.
 ${hasWeb ? `
 Web tools (available):
-- web_search(query): search the web. Returns ranked URLs + snippets. Call multiple times with different queries to research thoroughly.
-- fetch_url(url): fetch a full web page as markdown. Use after web_search to read promising pages in full.
-For research tasks, do NOT stop at one search. Run 5–10 targeted searches, fetch the most relevant pages, synthesize the findings, then write the output file.
+- web_search(query): search the web. Returns ranked URLs + snippets.
+- fetch_url(url): fetch a full web page as markdown.
+
+IMPORTANT research rules:
+- NEVER synthesize after just one search. Always run at least 3–5 web_search calls with different queries before drawing conclusions.
+- Use specific queries, not broad ones. Break the topic into angles: overview, recent news, expert opinions, data/stats, criticism.
+- After searching, fetch_url the 2–3 most promising URLs to get full content, not just snippets.
+- Only write the output file after you have gathered enough from multiple sources.
 ` : ""}
 Work autonomously. When done, summarize what you did and what files were created or modified.`;
 
