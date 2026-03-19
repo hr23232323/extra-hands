@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>extra-hands</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ── Header ──────────────────────────────────────────────────────────── -->
+  <header>
+    <span class="logo">extra-hands</span>
+    <div class="header-right">
+      <button id="theme-btn" class="icon-btn" title="Toggle theme">
+        <svg id="theme-icon-moon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M13 9.5a5.5 5.5 0 1 1-6.5-6.5 4.5 4.5 0 0 0 6.5 6.5z"/>
+        </svg>
+        <svg id="theme-icon-sun" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+          <circle cx="8" cy="8" r="3"/>
+          <line x1="8" y1="1" x2="8" y2="3"/><line x1="8" y1="13" x2="8" y2="15"/>
+          <line x1="1" y1="8" x2="3" y2="8"/><line x1="13" y1="8" x2="15" y2="8"/>
+        </svg>
+      </button>
+      <button id="settings-btn" class="icon-btn" title="Settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ── Settings panel ──────────────────────────────────────────────────── -->
+  <div id="settings-bar" class="settings-panel">
+    <div class="sp-row">
+      <span class="sp-label">model</span>
+      <select id="model-select"></select>
+    </div>
+    <div class="sp-row">
+      <span class="sp-label">api key</span>
+      <input type="password" id="api-key-input" placeholder="sk-or-..." autocomplete="off" spellcheck="false" />
+      <button id="save-key-btn">save</button>
+    </div>
+  </div>
+
+  <!-- ── Home view ───────────────────────────────────────────────────────── -->
+  <div id="view-home" class="view">
+
+    <!-- Workspace row -->
+    <div class="workspace-row">
+      <div class="workspace-info">
+        <span class="workspace-label">workspace</span>
+        <span id="workspace-path" class="workspace-path">no folder selected</span>
+      </div>
+      <button id="pick-folder-btn" class="ghost-btn">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M1 3.5A1.5 1.5 0 0 1 2.5 2h3.44l1.5 2H13.5A1.5 1.5 0 0 1 15 5.5v7a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 12.5z"/>
+        </svg>
+        change
+      </button>
+    </div>
+
+    <!-- Compose area -->
+    <div class="compose-area">
+      <textarea
+        id="task-input"
+        class="task-textarea"
+        placeholder="Describe a task…"
+        rows="4"
+        spellcheck="true"
+      ></textarea>
+      <div class="compose-examples" id="compose-examples">
+        <span class="example-label">try:</span>
+        <button class="example-chip" data-task="Scrape product prices from a website and save them as a CSV">scrape → CSV</button>
+        <button class="example-chip" data-task="Write a Python script to convert all CSVs in my folder to PDF">CSV → PDF script</button>
+        <button class="example-chip" data-task="Research and write a briefing doc on [topic], pulling in sources from the web">research doc</button>
+      </div>
+      <div class="compose-footer">
+        <span id="compose-hint" class="compose-hint"></span>
+        <button id="run-btn" class="run-btn" disabled>
+          run task
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="5 3 12 8 5 13"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Recent threads -->
+    <div id="threads-section" class="threads-section" style="display:none">
+      <div class="threads-header">recent</div>
+      <div id="threads-list" class="threads-list"></div>
+    </div>
+
+  </div>
+
+  <!-- ── Thread / agent view ─────────────────────────────────────────────── -->
+  <div id="view-thread" class="view" style="display:none">
+
+    <div class="thread-header">
+      <button id="back-btn" class="back-btn">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="10 3 3 8 10 13"/>
+        </svg>
+        back
+      </button>
+      <span id="thread-status-badge" class="status-badge"></span>
+    </div>
+
+    <div class="thread-task-title" id="thread-task-title"></div>
+
+    <div id="agent-feed" class="agent-feed">
+      <!-- Tool call chips and streamed output appear here -->
+    </div>
+
+    <div id="agent-result" class="agent-result" style="display:none">
+      <div class="result-label">result</div>
+      <div id="result-content" class="result-content"></div>
+    </div>
+
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
