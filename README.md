@@ -27,10 +27,9 @@
 
 ---
 
-<!-- TODO: replace with actual screenshot -->
-<!-- <p align="center">
-  <img src="docs/screenshot-home.png" alt="extra-hands screenshot" width="480"/>
-</p> -->
+<p align="center">
+  <img src="docs/Screen%20-%20Home.png" alt="extra-hands home" width="380"/>
+</p>
 
 ## What it does
 
@@ -72,7 +71,7 @@ No npm. No bundler. Frontend is plain HTML/CSS/JS in `frontend/` — edit and th
 
 | Feature | Status |
 |---|---|
-| `list_dir`, `read_file`, `write_file` tools | ✅ |
+| `list_dir`, `read_file`, `write_file`, `edit_file` tools | ✅ |
 | Streaming markdown + live tool step replay | ✅ |
 | Per-folder permission prompts (deny / allow / always) | ✅ |
 | Thread history — persistent, searchable, resumable | ✅ |
@@ -122,11 +121,19 @@ src-tauri/
 
 ## Screenshots
 
-To capture screenshots of the running app:
+<p align="center">
+  <img src="docs/Screen%20-%20Home.png" alt="Home" width="320"/>
+  &nbsp;&nbsp;
+  <img src="docs/Screen%20-%201.png" alt="Web research task" width="320"/>
+  &nbsp;&nbsp;
+  <img src="docs/Screen%202.png" alt="Write and edit task" width="320"/>
+</p>
+
+To capture a fresh screenshot of the running app:
 
 ```bash
-make dev                    # in one terminal
-./scripts/screenshot.sh     # in another — follow the prompts
+make dev         # in one terminal
+make screenshot  # in another
 ```
 
 ---
