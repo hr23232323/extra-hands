@@ -638,6 +638,20 @@ header {
 .back-btn svg { width: 13px; height: 13px; }
 .back-btn:hover { color: var(--text); background: var(--surface); }
 
+.stop-btn {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--error);
+  background: none;
+  border: 1px solid color-mix(in srgb, var(--error) 35%, transparent);
+  border-radius: var(--r);
+  padding: 3px 9px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+.stop-btn:hover { background: var(--error-bg); border-color: var(--error); }
+
 .status-badge {
   font-size: 10px;
   font-family: var(--mono);
@@ -892,6 +906,86 @@ header {
 }
 .thinking-replay.open { max-height: 160px; opacity: 1; }
 .thinking-replay .thinking-step { opacity: 1; transform: none; animation: none; padding-top: 3px; }
+
+/* ── File action cards ───────────────────────────────────────────────────── */
+.file-action-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 10px 4px 9px;
+  margin: 0 0 10px 0;
+  border-radius: var(--r);
+  border: 1px solid var(--border);
+  border-left-width: 2px;
+  background: var(--surface);
+  animation: msg-in 0.2s ease forwards;
+  opacity: 0;
+  transform: translateY(4px);
+}
+.file-action-card svg {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  opacity: 0.5;
+}
+.file-action-card .fa-op {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 10.5px;
+  font-weight: 400;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.file-action-card .fa-name {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--text-faint);
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-left: 7px;
+  border-left: 1px solid var(--border);
+}
+.file-action-card.fa-pending .fa-name {
+  animation: fa-pulse 1.3s ease-in-out infinite;
+}
+@keyframes fa-pulse {
+  0%, 100% { opacity: 0.2; }
+  50%       { opacity: 0.65; }
+}
+.file-action-card.fa-write {
+  border-left-color: var(--accent);
+  color: var(--accent);
+}
+.file-action-card.fa-read {
+  border-left-color: var(--blue);
+  color: var(--blue);
+}
+.file-action-card.fa-edit {
+  border-left-color: var(--green);
+  color: var(--green);
+}
+.file-action-card.fa-web {
+  border-left-color: var(--border-dark);
+  color: var(--text-muted);
+}
+
+/* ── Streaming cursor ────────────────────────────────────────────────────── */
+.bubble-content.streaming::after {
+  content: '▍';
+  display: inline-block;
+  font-size: 0.75em;
+  color: var(--accent);
+  opacity: 0.5;
+  margin-left: 2px;
+  vertical-align: middle;
+  animation: cursor-blink 0.9s step-end infinite;
+}
+@keyframes cursor-blink {
+  0%, 100% { opacity: 0.5; }
+  50%       { opacity: 0; }
+}
 
 .error-msg {
   color: var(--error);

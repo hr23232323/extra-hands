@@ -7,6 +7,7 @@ import {
   addTrustedFolder,
 } from "./state.js";
 import { orchestrateMessage } from "./search.js";
+import { normPath as _normPath, boxPath as _boxPath, applyEdit as _applyEdit } from "./utils.js";
 import * as smd from "https://cdn.jsdelivr.net/npm/streaming-markdown/smd.min.js";
 
 // ── Tauri IPC stubs ────────────────────────────────────────────────────────────
@@ -17,7 +18,7 @@ async function readFile(path)           { return invoke("read_file",  { path });
 async function writeFile(path, content) { return invoke("write_file", { path, content }); }
 async function pickFolder()             { return invoke("pick_folder"); }
 
-const normPath = p => p.replace(/\\/g, "/");
+const normPath = _normPath;
 
 // ── Title generation ────────────────────────────────────────────────────────────
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
@@ -49,22 +50,7 @@ async function generateTitle(task, apiKey, model) {
   }
 }
 
-// Box any path (relative, absolute, or already workspace-prefixed) into the
-// workspace root. Neutralizes path traversal (../../etc/passwd → workspace/etc/passwd).
-function boxPath(workspace, rawPath) {
-  if (!workspace) return normPath(rawPath);
-  let rel = normPath(rawPath);
-  // Strip workspace prefix or any leading slash so we always treat as relative
-  if (rel.startsWith(workspace + "/")) rel = rel.slice(workspace.length + 1);
-  else if (rel.startsWith("/"))        rel = rel.slice(1);
-  // Resolve . and .. segments
-  const parts = [];
-  for (const seg of rel.split("/")) {
-    if (seg === "..") parts.pop();
-    else if (seg && seg !== ".") parts.push(seg);
-  }
-  return `${workspace}/${parts.join("/")}`;
-}
+const boxPath = _boxPath;
 
 function _parentDir(path) {
   const norm = normPath(path);
@@ -422,11 +408,15 @@ function renderThreadView() {
   // User task bubble
   feed.appendChild(_makeChatMsg("user", activeThread.title));
 
-  // Group tool calls before each text message into a collapsible tools block
+  // Replay messages: write/edit get inline pills, all tools accumulate into dropdown
   let pendingTools = [];
   for (const msg of activeThread.messages) {
     if (msg.type === "tool") {
       pendingTools.push(msg);
+      if (PILL_TOOLS.has(msg.toolName)) {
+        const op = _ALL_OPS[msg.toolName];
+        if (op) feed.appendChild(_makeFileActionCard(op, msg.toolArg ?? ""));
+      }
     } else if (msg.type === "text") {
       feed.appendChild(_makeChatMsg("assistant", msg.content, pendingTools));
       pendingTools = [];
@@ -462,8 +452,10 @@ async function jinaFetch(url, key) {
 
 // ── Tool definitions ────────────────────────────────────────────────────────────
 
-let _liveThinkingEl = null;
-let _liveTools = [];
+let _liveThinkingEl    = null;
+let _liveTools         = [];
+let _pendingFileCard   = null;
+let _agentStopRequested = false;
 const FILE_TOOLS = [
   {
     type: "function",
@@ -485,11 +477,39 @@ const FILE_TOOLS = [
     type: "function",
     function: {
       name: "write_file",
-      description: "Write or overwrite a file with the given content.",
+      description: "Write or overwrite a file with the given content. Use for new files. For editing existing files, prefer edit_file.",
       parameters: {
         type: "object",
         properties: { path: { type: "string" }, content: { type: "string" } },
         required: ["path", "content"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "edit_file",
+      description: `Make a targeted edit to an existing file by replacing a specific string.
+
+Rules you MUST follow:
+1. Always call read_file first. Copy old_string EXACTLY from the output, preserving indentation and whitespace.
+2. old_string must uniquely identify the location. If the text appears multiple times, add more surrounding lines until it is unique.
+3. To rename a variable or string everywhere in a file, set replace_all=true.
+4. If you get "not found", re-read the file — the content may have changed since you last read it.
+
+Errors you may receive and how to fix them:
+- "old_string not found": re-read the file and copy old_string exactly.
+- "Found N matches": add more surrounding context lines to old_string.
+- "File modified since last read": call read_file again before editing.`,
+      parameters: {
+        type: "object",
+        properties: {
+          path:        { type: "string",  description: "Path to the file" },
+          old_string:  { type: "string",  description: "The exact text to find and replace" },
+          new_string:  { type: "string",  description: "The replacement text" },
+          replace_all: { type: "boolean", description: "If true, replace every occurrence instead of just the first. Use for rename-style changes." },
+        },
+        required: ["path", "old_string", "new_string"],
       },
     },
   },
@@ -522,15 +542,46 @@ const WEB_TOOLS = [
   },
 ];
 
+const _FA_ICONS = {
+  write:  `<svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 10.5V12h1.5l5-5L7 5.5l-5 5zM11.5 3.5a1.1 1.1 0 0 0-1.5-1.5L8.5 3.5 10 5l1.5-1.5z"/></svg>`,
+  edit:   `<svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2l3 3-7 7H2V9l7-7z"/><line x1="7" y1="4" x2="10" y2="7"/></svg>`,
+  read:   `<svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 2h10v10H2z"/><line x1="4.5" y1="5" x2="9.5" y2="5"/><line x1="4.5" y1="7.5" x2="9.5" y2="7.5"/><line x1="4.5" y1="10" x2="7" y2="10"/></svg>`,
+  search: `<svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="4"/><line x1="9.5" y1="9.5" x2="12" y2="12"/></svg>`,
+  fetch:  `<svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 7a6 6 0 1 0 12 0A6 6 0 0 0 1 7z"/><path d="M7 1c-1.5 2-2 3.5-2 6s.5 4 2 6M7 1c1.5 2 2 3.5 2 6s-.5 4-2 6M1 7h12"/></svg>`,
+};
+const _ALL_OPS = {
+  read_file: "read", write_file: "write", edit_file: "edit",
+  web_search: "search", fetch_url: "fetch",
+};
+
+// Only these tools get inline animated pills; all others appear in the tools ▸ dropdown
+const PILL_TOOLS = new Set(["write_file", "edit_file"]);
+
+function _makeFileActionCard(op, label) {
+  const card = document.createElement("div");
+  const isWeb = op === "search" || op === "fetch";
+  card.className = `file-action-card ${isWeb ? "fa-web" : `fa-${op}`}`;
+  const icon = _FA_ICONS[op] ?? "";
+  card.innerHTML = `${icon}<span class="fa-op">${op}</span><span class="fa-name" title="${escapeHtml(label)}">${escapeHtml(label.split("/").pop() || label)}</span>`;
+  return card;
+}
+
+
 function _logToolStep(toolName, toolArg) {
   const { activeThread } = getState();
   if (!activeThread) return;
   appendMessage({ type: "tool", toolName, toolArg });
-  if (_liveThinkingEl) {
-    addThinkingStep(_liveThinkingEl, toolName, toolArg);
-    _liveTools.push({ toolName, toolArg });
-    $("agent-feed").scrollTop = $("agent-feed").scrollHeight;
+  _liveTools.push({ toolName, toolArg });
+  // Recreate thinking indicator if it was collapsed by a prior text chunk
+  if (!_liveThinkingEl) {
+    _liveThinkingEl = createThinkingIndicator();
+    $("agent-feed").appendChild(_liveThinkingEl);
   }
+  // Pill tools show their own animated pill; dropdown tools need a thinking step
+  if (!PILL_TOOLS.has(toolName)) {
+    addThinkingStep(_liveThinkingEl, toolName, toolArg);
+  }
+  $("agent-feed").scrollTop = $("agent-feed").scrollHeight;
 }
 
 async function executeTool(toolName, argsStr) {
@@ -541,9 +592,10 @@ async function executeTool(toolName, argsStr) {
   if (toolName === "web_search") {
     const { tavilyKey } = getState();
     if (!tavilyKey) return "Error: Tavily API key not set. Add it in Settings to enable web search.";
-    _logToolStep("web_search", args.query ?? "");
+    const query = args.query ?? "";
+    _logToolStep("web_search", query);
     try {
-      return JSON.stringify(await tavilySearch(args.query, tavilyKey));
+      return JSON.stringify(await tavilySearch(query, tavilyKey));
     } catch (err) {
       return `Error: ${err.message ?? err}`;
     }
@@ -551,9 +603,10 @@ async function executeTool(toolName, argsStr) {
 
   if (toolName === "fetch_url") {
     const { jinaKey } = getState();
-    _logToolStep("fetch_url", args.url ?? "");
+    const url = args.url ?? "";
+    _logToolStep("fetch_url", url);
     try {
-      return await jinaFetch(args.url, jinaKey);
+      return await jinaFetch(url, jinaKey);
     } catch (err) {
       return `Error: ${err.message ?? err}`;
     }
@@ -572,12 +625,36 @@ async function executeTool(toolName, argsStr) {
 
   _logToolStep(toolName, path);
 
+  // Only write_file and edit_file get inline pills; read_file/list_dir go to dropdown only
+  if (PILL_TOOLS.has(toolName)) {
+    const op   = _ALL_OPS[toolName];
+    const name = path.split("/").pop() || path;
+    if (_pendingFileCard) {
+      const nameEl = _pendingFileCard.querySelector(".fa-name");
+      if (nameEl) { nameEl.textContent = name; nameEl.title = path; }
+      _pendingFileCard.classList.remove("fa-pending");
+      _pendingFileCard = null;
+    } else {
+      const feed = $("agent-feed");
+      if (feed) { feed.appendChild(_makeFileActionCard(op, path)); feed.scrollTop = feed.scrollHeight; }
+    }
+  }
+
   try {
     if (toolName === "list_dir")   return JSON.stringify(await listDir(path));
     if (toolName === "read_file")  return await readFile(path);
     if (toolName === "write_file") {
       if (args.content === undefined) return "Error: write_file requires content.";
       await writeFile(path, args.content);
+      return "ok";
+    }
+    if (toolName === "edit_file") {
+      if (args.old_string === undefined || args.new_string === undefined)
+        return "Error: edit_file requires old_string and new_string.";
+      const current = await readFile(path);
+      const { result, error } = _applyEdit(current, args.old_string, args.new_string, args.replace_all ?? false);
+      if (error) return `Error: ${error}`;
+      await writeFile(path, result);
       return "ok";
     }
     return "Error: unknown tool.";
@@ -589,6 +666,7 @@ async function executeTool(toolName, argsStr) {
 function _setThreadComposeEnabled(enabled) {
   $("thread-input").disabled = !enabled;
   $("thread-send-btn").disabled = !enabled || !$("thread-input").value.trim();
+  $("stop-btn").style.display = enabled ? "none" : "inline-flex";
 }
 
 function _buildMessages(thread) {
@@ -627,7 +705,15 @@ async function runAgentLoop(isContinuation = false) {
   const hasWeb = !!tavilyKey;
   const tools = hasWeb ? [...FILE_TOOLS, ...WEB_TOOLS] : FILE_TOOLS;
 
-  const systemPrompt = `You are extra-hands, an autonomous agent running inside the user's workspace.
+  const now = new Date();
+  const dateTimeStr = now.toLocaleString("en-US", {
+    weekday: "long", year: "numeric", month: "long", day: "numeric",
+    hour: "2-digit", minute: "2-digit", timeZoneName: "short",
+  });
+
+  const systemPrompt = `Today is ${dateTimeStr}.
+
+You are extra-hands, an autonomous agent running inside the user's workspace.
 
 File tools (always available):
 - list_dir(path): list files in a directory. Use relative paths — e.g. "." or "subdir/".
@@ -653,17 +739,31 @@ Work autonomously. When done, summarize what you did and what files were created
   let contentEl = null, mdParser = null, observer = null;
   let lastResult = null, scrollPending = false;
 
+  function onToolName(name) {
+    if (!PILL_TOOLS.has(name)) return;
+    const op = _ALL_OPS[name];
+    if (!op) return;
+    const card = _makeFileActionCard(op, "…");
+    card.classList.add("fa-pending");
+    _pendingFileCard = card;
+    const feed = $("agent-feed");
+    if (feed) { feed.appendChild(card); feed.scrollTop = feed.scrollHeight; }
+  }
+
   function onDelta(delta) {
     if (viewThread.style.display === "none") return;
     if (!contentEl) {
-      // First text of this turn — capture accumulated tools, reset for next turn
+      // First text of this turn — collapse whatever thinking indicator is active
+      // (may be the original thinkingEl or one recreated mid-loop by _logToolStep)
+      const activeThinking = _liveThinkingEl;
       _liveThinkingEl = null;
-      collapseThinking(thinkingEl, () => {});
+      if (activeThinking) collapseThinking(activeThinking, () => {});
       const capturedTools = _liveTools;
       _liveTools = [];
       const msgEl = _makeChatMsg("assistant", "", capturedTools);
       feed.appendChild(msgEl);
       contentEl = msgEl.querySelector(".bubble-content");
+      contentEl.classList.add("streaming");
       mdParser = smd.parser(smd.default_renderer(contentEl));
       observer = new MutationObserver(mutations => {
         for (const m of mutations)
@@ -682,22 +782,48 @@ Work autonomously. When done, summarize what you did and what files were created
   function resetStreamState() {
     if (observer) { observer.disconnect(); observer = null; }
     if (mdParser) { smd.parser_end(mdParser); mdParser = null; }
-    contentEl = null;
+    if (contentEl) { contentEl.classList.remove("streaming"); contentEl = null; }
     // _liveTools intentionally NOT cleared here — tools accumulate across
     // tool-call turns and are captured when the next text bubble is created
   }
 
+  const MAX_TURNS = 25;
+  let ranToCompletion = false;
+  let lastCallKey = null;
+
+  function _showAgentError(msg) {
+    const el = _makeChatMsg("assistant", "");
+    el.querySelector(".bubble-content").innerHTML = `<span class="error-msg">${escapeHtml(msg)}</span>`;
+    feed.appendChild(el);
+  }
+
   try {
-    for (let turn = 0; turn < 25; turn++) {
+    _agentStopRequested = false;
+
+    for (let turn = 0; turn < MAX_TURNS; turn++) {
+      if (_agentStopRequested) {
+        _agentStopRequested = false;
+        _showAgentError("Stopped.");
+        break;
+      }
+
       const result = await orchestrateMessage({
         apiKey, model, messages, systemPrompt,
         tools,
         onDelta,
+        onToolName,
       });
 
       if (result.toolCall) {
-        // Reset streaming state so next turn's text starts a fresh bubble
         resetStreamState();
+
+        // Repeated-call detection — same tool + same args twice in a row = stuck
+        const callKey = `${result.toolCall.name}\0${result.toolCall.args}`;
+        if (callKey === lastCallKey) {
+          _showAgentError(`Agent is repeating the same tool call (${result.toolCall.name}) — stopping to prevent a loop.`);
+          break;
+        }
+        lastCallKey = callKey;
 
         messages.push({
           role: "assistant", content: result.fullText || null,
@@ -712,15 +838,24 @@ Work autonomously. When done, summarize what you did and what files were created
           messages.push({ role: "assistant", content: result.fullText });
           lastResult = result.fullText;
         }
+        ranToCompletion = true;
         break;
       }
     }
 
-    await updateActiveThread({ status: "done", result: lastResult });
+    if (!ranToCompletion && !_agentStopRequested) {
+      // Hit the turn cap without a final text response
+      _showAgentError(`Reached the ${MAX_TURNS}-turn limit without completing. Try breaking the task into smaller steps.`);
+      await updateActiveThread({ status: "error" });
+    } else {
+      await updateActiveThread({ status: "done", result: lastResult });
+    }
   } catch (err) {
     console.error("[extra-hands] agent error:", err);
+    const errThinking = _liveThinkingEl;
     _liveThinkingEl = null;
-    if (thinkingEl.parentNode) { thinkingEl.style.transition = "none"; thinkingEl.remove(); }
+    if (errThinking?.parentNode) { errThinking.style.transition = "none"; errThinking.remove(); }
+    else if (thinkingEl.parentNode) { thinkingEl.style.transition = "none"; thinkingEl.remove(); }
     const errEl = _makeChatMsg("assistant", "");
     errEl.querySelector(".bubble-content").innerHTML = `<span class="error-msg">${escapeHtml("Error: " + err.message)}</span>`;
     feed.appendChild(errEl);
@@ -850,6 +985,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   $("back-btn").addEventListener("click", showHome);
+  $("stop-btn").addEventListener("click", () => { _agentStopRequested = true; });
 
   // Inline-editable thread title
   const titleEl = $("thread-task-title");

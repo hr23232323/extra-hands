@@ -1,4 +1,4 @@
-.PHONY: help setup dev build check
+.PHONY: help setup dev build check test
 
 help:
 	@echo "Usage:"
@@ -6,6 +6,7 @@ help:
 	@echo "  make dev     Run in development mode (hot reload)"
 	@echo "  make build   Build the .app for distribution"
 	@echo "  make check   Run cargo check"
+	@echo "  make test    Run JS tests"
 
 setup:
 	cargo install tauri-cli --version "^2"
@@ -18,3 +19,6 @@ build:
 
 check:
 	cargo check --manifest-path src-tauri/Cargo.toml
+
+test:
+	npm test

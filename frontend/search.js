@@ -11,7 +11,7 @@ const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
  * @param {ReadableStreamDefaultReader} reader
  * @param {(delta: string) => void} onDelta
  */
-export async function parseStream(reader, onDelta) {
+export async function parseStream(reader, onDelta, onToolName) {
   const decoder = new TextDecoder();
   let buffer = "";
   const pendingToolCalls = {}; // keyed by index
@@ -38,9 +38,13 @@ export async function parseStream(reader, onDelta) {
           for (const tc of tcDelta) {
             const idx = tc.index ?? 0;
             if (!pendingToolCalls[idx]) pendingToolCalls[idx] = { id: "", name: "", args: "" };
-            if (tc.id)                   pendingToolCalls[idx].id   = tc.id;
-            if (tc.function?.name)       pendingToolCalls[idx].name += tc.function.name;
-            if (tc.function?.arguments)  pendingToolCalls[idx].args += tc.function.arguments;
+            if (tc.id) pendingToolCalls[idx].id = tc.id;
+            if (tc.function?.name) {
+              // Fire onToolName once, as soon as we first see the name
+              if (!pendingToolCalls[idx].name) onToolName?.(tc.function.name);
+              pendingToolCalls[idx].name += tc.function.name;
+            }
+            if (tc.function?.arguments) pendingToolCalls[idx].args += tc.function.arguments;
           }
         }
 
@@ -76,6 +80,7 @@ export async function orchestrateMessage({
   systemPrompt,
   tools,
   onDelta,
+  onToolName,
   _fetch = fetch,
 }) {
   console.log("[extra-hands] orchestrateMessage — model:", model, "| tools:", tools?.length ?? 0);
@@ -106,7 +111,7 @@ export async function orchestrateMessage({
   const { toolCall } = await parseStream(res.body.getReader(), (delta) => {
     fullText += delta;
     onDelta(delta);
-  });
+  }, onToolName);
 
   console.log("[extra-hands] stream done — toolCall:", toolCall ? toolCall.name : "null");
 
