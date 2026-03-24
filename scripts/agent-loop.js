@@ -149,9 +149,19 @@ First, assess whether the task has genuine ambiguity that would change what you 
 
 Do not ask about things you can figure out by exploring the workspace first. Do not ask multiple questions. One question, or none.
 
+## Scratchpad
+
+You have a working memory file at _scratch.md in the workspace root. Use it actively:
+- At the start of every task, write your initial plan and what you know so far.
+- After each significant discovery (files found, content read, decisions made), update it.
+- When you need to recall what you've done so far, read it instead of scrolling back through the conversation.
+- _scratch.md is yours to overwrite freely — it's not a deliverable.
+
 ## Approach
 
 **Explore first.** Start every task with list_dir(".") to understand the workspace. List subdirectories that seem relevant. Build a mental map before reading or writing anything.
+
+**Think before every tool call.** In one sentence, state what you're about to do and why before calling any tool. This keeps your reasoning visible and your actions deliberate.
 
 **Plan before acting.** After exploring, think through the full task: which files need to be read, what will be created or changed, in what order. For multi-step tasks, state your plan briefly before starting.
 
@@ -288,7 +298,18 @@ for (let turn = 0; turn < maxTurns; turn++) {
     const result = await executeTool(toolCall.name, toolCall.args);
     const isError = String(result).startsWith("Error:");
 
-    console.log(`  result  ${isError ? red(String(result)) : dim(String(result))}`);
+    // Show scratchpad writes inline so you can watch the agent's thinking evolve
+    const isScratch = toolCall.name === "write_file" &&
+      (() => { try { return JSON.parse(toolCall.args).path?.includes("_scratch"); } catch { return false; } })();
+
+    if (isScratch && !isError) {
+      const content = (() => { try { return JSON.parse(toolCall.args).content ?? ""; } catch { return ""; } })();
+      console.log(`  scratch ┌${"─".repeat(W - 12)}`);
+      for (const line of content.split("\n")) console.log(`         │ ${dim(line)}`);
+      console.log(`         └${"─".repeat(W - 12)}`);
+    } else {
+      console.log(`  result  ${isError ? red(String(result)) : dim(String(result))}`);
+    }
     console.log();
 
     messages.push({ role: "tool", tool_call_id: toolCall.id, content: String(result) });
