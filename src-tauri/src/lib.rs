@@ -159,6 +159,15 @@ fn write_file(path: String, content: String) -> Result<(), String> {
     std::fs::write(&path, content).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+fn open_path(path: String) -> Result<(), String> {
+    std::process::Command::new("open")
+        .arg(&path)
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 fn toggle_window<R: Runtime>(app: &tauri::AppHandle<R>, tray_rect: &tauri::Rect) {
     if let Some(window) = app.get_webview_window("main") {
         if window.is_visible().unwrap_or(false) {
@@ -215,6 +224,7 @@ pub fn run() {
             list_dir,
             read_file,
             write_file,
+            open_path,
         ])
         .setup(|app| {
             let _ = app.store("store.json")?;

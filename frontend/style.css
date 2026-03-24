@@ -867,6 +867,8 @@ header {
   max-width: 340px;
 }
 .thinking-step-text em { font-style: normal; color: var(--text-muted); }
+.thinking-step-text em[data-open-path] { cursor: pointer; }
+.thinking-step-text em[data-open-path]:hover { text-decoration: underline; text-decoration-style: dotted; }
 
 /* ── Assistant msg header + tools replay ────────────────────────────────── */
 .msg-header:empty { display: none; }
@@ -946,6 +948,14 @@ header {
   white-space: nowrap;
   padding-left: 7px;
   border-left: 1px solid var(--border);
+}
+.file-action-card:not(.fa-pending) .fa-name[data-open-path] {
+  cursor: pointer;
+}
+.file-action-card:not(.fa-pending) .fa-name[data-open-path]:hover {
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: currentColor;
 }
 .file-action-card.fa-pending .fa-name {
   animation: fa-pulse 1.3s ease-in-out infinite;

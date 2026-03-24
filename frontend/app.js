@@ -17,6 +17,15 @@ async function listDir(path)            { return invoke("list_dir",   { path });
 async function readFile(path)           { return invoke("read_file",  { path }); }
 async function writeFile(path, content) { return invoke("write_file", { path, content }); }
 async function pickFolder()             { return invoke("pick_folder"); }
+async function openPath(path)           { return invoke("open_path",  { path }); }
+
+// Open files/URLs when clicking any [data-open-path] element
+document.addEventListener("click", e => {
+  const el = e.target.closest("[data-open-path]");
+  if (!el || el.closest(".fa-pending")) return;
+  e.stopPropagation();
+  openPath(el.dataset.openPath);
+});
 
 const normPath = _normPath;
 
@@ -97,8 +106,13 @@ function _renderMarkdown(container, text) {
   smd.parser_end(parser);
 }
 
+const OPENABLE_TOOLS = new Set(["list_dir", "read_file", "write_file", "edit_file", "fetch_url"]);
+
 function _buildStepHtml(toolName, toolArg) {
-  return `<span class="thinking-step-arrow">↳</span><span class="thinking-step-text">${escapeHtml(toolName)}${toolArg ? ` <em>${escapeHtml(toolArg)}</em>` : ""}</span>`;
+  const argHtml = toolArg
+    ? ` <em ${OPENABLE_TOOLS.has(toolName) ? `data-open-path="${escapeHtml(toolArg)}"` : ""}>${escapeHtml(toolArg)}</em>`
+    : "";
+  return `<span class="thinking-step-arrow">↳</span><span class="thinking-step-text">${escapeHtml(toolName)}${argHtml}</span>`;
 }
 
 function _attachToolsReplay(header, tools) {
@@ -562,7 +576,8 @@ function _makeFileActionCard(op, label) {
   const isWeb = op === "search" || op === "fetch";
   card.className = `file-action-card ${isWeb ? "fa-web" : `fa-${op}`}`;
   const icon = _FA_ICONS[op] ?? "";
-  card.innerHTML = `${icon}<span class="fa-op">${op}</span><span class="fa-name" title="${escapeHtml(label)}">${escapeHtml(label.split("/").pop() || label)}</span>`;
+  const isPlaceholder = label === "…";
+  card.innerHTML = `${icon}<span class="fa-op">${op}</span><span class="fa-name" title="${escapeHtml(label)}" ${isPlaceholder ? "" : `data-open-path="${escapeHtml(label)}"`}>${escapeHtml(label.split("/").pop() || label)}</span>`;
   return card;
 }
 
@@ -631,7 +646,7 @@ async function executeTool(toolName, argsStr) {
     const name = path.split("/").pop() || path;
     if (_pendingFileCard) {
       const nameEl = _pendingFileCard.querySelector(".fa-name");
-      if (nameEl) { nameEl.textContent = name; nameEl.title = path; }
+      if (nameEl) { nameEl.textContent = name; nameEl.title = path; nameEl.dataset.openPath = path; }
       _pendingFileCard.classList.remove("fa-pending");
       _pendingFileCard = null;
     } else {
